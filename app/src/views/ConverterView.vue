@@ -8,6 +8,7 @@ import {
   uint8ArrayToObjectUrl,
   isWorkerReady 
 } from '@/services/ghostscript/GhostscriptWorkerService';
+import { AppEvents } from '@/services/firebase';
 
 // Estado
 const isLoading = ref(false);
@@ -110,9 +111,13 @@ async function loadAndAnalyzeFile(file: File) {
     firstPage.value = 1;
     lastPage.value = result.pageCount;
     
+    // Rastrear PDF carregado
+    AppEvents.pdfLoaded(file.name, file.size, result.pageCount);
+    
   } catch (err) {
     console.error('Erro ao analisar PDF:', err);
     error.value = err instanceof Error ? err.message : 'Erro ao analisar PDF';
+    AppEvents.errorOccurred('pdf_analysis', String(err));
   } finally {
     isAnalyzing.value = false;
   }
@@ -124,6 +129,7 @@ async function handleConvert() {
   error.value = null;
   resultImages.value = [];
   progress.value = { current: 0, total: 0 };
+  const startTime = Date.now();
   
   try {
     isConverting.value = true;
@@ -131,6 +137,10 @@ async function handleConvert() {
     // Determinar range de páginas
     const convertFirstPage = pageMode.value === 'range' ? firstPage.value : undefined;
     const convertLastPage = pageMode.value === 'range' ? lastPage.value : undefined;
+    const pageRange = pageMode.value === 'range' ? `${firstPage.value}-${lastPage.value}` : 'all';
+    
+    // Rastrear início da conversão
+    AppEvents.conversionStarted(dpi.value, grayscale.value, pageRange);
     
     // Usar Worker para conversão (não bloqueia UI!)
     const result = await convertPdfWithWorker(pdfDataCache.value, {
@@ -145,9 +155,13 @@ async function handleConvert() {
     
     resultImages.value = result.images.map(img => uint8ArrayToObjectUrl(img));
     
+    // Rastrear conclusão
+    AppEvents.conversionCompleted(dpi.value, result.images.length, Date.now() - startTime);
+    
   } catch (err) {
     console.error('Erro na conversão:', err);
     error.value = err instanceof Error ? err.message : 'Erro desconhecido';
+    AppEvents.errorOccurred('conversion', String(err));
   } finally {
     isLoading.value = false;
     isConverting.value = false;
@@ -162,6 +176,9 @@ function handleDownloadSingle(url: string, index: number) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  
+  // Rastrear download
+  AppEvents.imageDownloaded(index + 1);
 }
 
 const isZipping = ref(false);
@@ -200,6 +217,9 @@ async function handleDownloadAll() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
+    
+    // Rastrear download ZIP
+    AppEvents.zipDownloaded(resultImages.value.length);
     
   } catch (err) {
     console.error('Erro ao criar ZIP:', err);
