@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { 
-  initGhostscript, 
-  convertPdfToImages, 
-  uint8ArrayToDataUrl,
-  isGhostscriptReady 
-} from '@/services/ghostscript/GhostscriptService';
+  initGhostscriptWorker, 
+  convertPdfWithWorker, 
+  uint8ArrayToObjectUrl,
+  isWorkerReady 
+} from '@/services/ghostscript/GhostscriptWorkerService';
 
 // Estado
 const isLoading = ref(false);
@@ -21,6 +21,10 @@ const dpi = ref<72 | 150 | 300 | 600>(150);
 const grayscale = ref(false);
 
 // Computed
+const progressPercent = computed(() => {
+  if (progress.value.total === 0) return 0;
+  return Math.round((progress.value.current / progress.value.total) * 100);
+});
 
 const statusText = computed(() => {
   if (isLoading.value) return 'Carregando Ghostscript (~16MB)...';
@@ -76,11 +80,13 @@ async function handleConvert() {
   
   error.value = null;
   resultImages.value = [];
+  progress.value = { current: 0, total: 0 };
   
   try {
-    if (!isGhostscriptReady()) {
+    // Inicializar Worker se necessário
+    if (!isWorkerReady()) {
       isLoading.value = true;
-      await initGhostscript();
+      await initGhostscriptWorker();
       isLoading.value = false;
     }
     
@@ -88,7 +94,8 @@ async function handleConvert() {
     const buffer = await selectedFile.value.arrayBuffer();
     const pdfData = new Uint8Array(buffer);
     
-    const result = await convertPdfToImages(pdfData, {
+    // Usar Worker para conversão (não bloqueia UI!)
+    const result = await convertPdfWithWorker(pdfData, {
       dpi: dpi.value,
       grayscale: grayscale.value,
       onProgress: (current, total) => {
@@ -96,7 +103,7 @@ async function handleConvert() {
       },
     });
     
-    resultImages.value = result.images.map(img => uint8ArrayToDataUrl(img));
+    resultImages.value = result.images.map(img => uint8ArrayToObjectUrl(img));
     
   } catch (err) {
     console.error('Erro na conversão:', err);
@@ -267,19 +274,22 @@ function clearFile() {
           <h3 class="progress-title" v-if="isLoading">Carregando Ghostscript</h3>
           <h3 class="progress-title" v-else>Processando PDF</h3>
           <p class="progress-status">{{ statusText }}</p>
-          <p class="progress-hint" v-if="isConverting">
-            ⏳ A conversão está em andamento.<br/>
-            A interface pode pausar brevemente durante o processamento.
+          
+          <!-- Barra de progresso real-time -->
+          <div v-if="isConverting && progress.total > 0" class="progress-bar-section">
+            <div class="progress-bar-container">
+              <div class="progress-bar" :style="{ width: `${progressPercent}%` }"></div>
+            </div>
+            <span class="progress-percent">{{ progressPercent }}%</span>
+          </div>
+          
+          <p class="progress-hint" v-if="isConverting && progress.total === 0">
+            ⏳ Analisando documento...
           </p>
           <p class="progress-hint" v-if="isLoading">
             📦 Baixando módulo WebAssembly (~16MB)...<br/>
             Isso só acontece na primeira vez.
           </p>
-        </div>
-        <div class="progress-dots">
-          <span class="dot"></span>
-          <span class="dot"></span>
-          <span class="dot"></span>
         </div>
       </section>
 
@@ -979,6 +989,37 @@ function clearFile() {
   color: var(--text-muted);
   font-size: 0.9rem;
   line-height: 1.6;
+}
+
+.progress-bar-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  width: 100%;
+  max-width: 400px;
+}
+
+.progress-bar-container {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--gradient);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-percent {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gs-cyan-light);
+  min-width: 50px;
 }
 
 .progress-dots {
