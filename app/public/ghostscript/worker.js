@@ -8,27 +8,42 @@
 // Estado do módulo
 let gsModule = null;
 let detectedTotalPages = 0;
+let isAnalyzing = false;
+let analyzedPageCount = 0;
 
 // Processar output do Ghostscript para progresso
 function handleGsOutput(text) {
-  // Detectar total de páginas
+  // Detectar total de páginas - "Processing pages X through Y"
   const pagesMatch = text.match(/Processing pages? (\d+) through (\d+)/i);
   if (pagesMatch && pagesMatch[2]) {
-    detectedTotalPages = parseInt(pagesMatch[2], 10);
-    self.postMessage({ 
-      type: 'progress', 
-      payload: { current: 0, total: detectedTotalPages }
-    });
+    const count = parseInt(pagesMatch[2], 10);
+    detectedTotalPages = count;
+    
+    // Se estamos analisando, salvar contagem
+    if (isAnalyzing) {
+      analyzedPageCount = count;
+    } else {
+      self.postMessage({ 
+        type: 'progress', 
+        payload: { current: 0, total: count }
+      });
+    }
   }
   
-  // Detectar página atual
+  // Detectar página atual durante conversão
   const pageMatch = text.match(/^Page (\d+)$/i);
-  if (pageMatch && pageMatch[1]) {
+  if (pageMatch && pageMatch[1] && !isAnalyzing) {
     const currentPage = parseInt(pageMatch[1], 10);
     self.postMessage({ 
       type: 'progress', 
       payload: { current: currentPage, total: detectedTotalPages }
     });
+  }
+  
+  // Detectar número direto (do pdfpagecount)
+  const numMatch = text.trim().match(/^(\d+)$/);
+  if (numMatch && isAnalyzing) {
+    analyzedPageCount = parseInt(numMatch[1], 10);
   }
 }
 
@@ -75,74 +90,37 @@ async function analyzePdf(pdfData) {
   }
   
   try {
+    isAnalyzing = true;
+    analyzedPageCount = 0;
+    
     // Criar diretórios
     try { gsModule.FS.mkdir('/tmp'); } catch (e) { /* já existe */ }
     
     // Escrever PDF de entrada
     gsModule.FS.writeFile('/tmp/analyze.pdf', pdfData);
     
-    let pageCount = 0;
-    
-    // Interceptar console.log para capturar output do GS
-    const originalLog = console.log;
-    console.log = (...args) => {
-      const text = args.join(' ');
-      const num = parseInt(text.trim(), 10);
-      if (!isNaN(num) && num > 0) {
-        pageCount = num;
-      }
-      // Também checar "Processing pages X through Y"
-      const match = text.match(/Processing pages? (\d+) through (\d+)/i);
-      if (match && match[2]) {
-        pageCount = parseInt(match[2], 10);
-      }
-    };
-    
-    // Comando PostScript para contar páginas
-    const args = [
-      '-dNOPAUSE',
-      '-dBATCH',
+    // Usar nullpage device - mais confiável que PostScript
+    // Isso dispara "Processing pages 1 through X" que capturamos
+    gsModule.callMain([
+      '-dNOPAUSE', 
+      '-dBATCH', 
       '-dSAFER',
-      '-dNODISPLAY',
-      '-dQUIET',
-      '-c',
-      '(/tmp/analyze.pdf) (r) file runpdfbegin pdfpagecount = quit',
-    ];
-    
-    gsModule.callMain(args);
-    console.log = originalLog;
+      '-sDEVICE=nullpage',
+      '/tmp/analyze.pdf'
+    ]);
     
     // Limpar
     try { gsModule.FS.unlink('/tmp/analyze.pdf'); } catch (e) { /* ignore */ }
     
-    // Se não conseguiu via PostScript, tenta fallback com nullpage
-    if (pageCount === 0) {
-      gsModule.FS.writeFile('/tmp/analyze.pdf', pdfData);
-      
-      console.log = (...args) => {
-        const text = args.join(' ');
-        const match = text.match(/Processing pages? (\d+) through (\d+)/i);
-        if (match && match[2]) {
-          pageCount = parseInt(match[2], 10);
-        }
-      };
-      
-      gsModule.callMain([
-        '-dNOPAUSE', '-dBATCH', '-dSAFER',
-        '-sDEVICE=nullpage',
-        '/tmp/analyze.pdf'
-      ]);
-      
-      console.log = originalLog;
-      try { gsModule.FS.unlink('/tmp/analyze.pdf'); } catch (e) { /* ignore */ }
-    }
+    isAnalyzing = false;
     
     self.postMessage({ 
       type: 'analyzed', 
-      payload: { pageCount }
+      payload: { pageCount: analyzedPageCount }
     });
     
   } catch (error) {
+    isAnalyzing = false;
     self.postMessage({ 
       type: 'error', 
       payload: { error: error.message || 'Erro ao analisar PDF' }
