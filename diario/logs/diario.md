@@ -1,47 +1,75 @@
-# 📅 Log de Desenvolvimento
+# 📔 Log Diário de Desenvolvimento
 
 ---
 
-## 2025-12-19
+## 19/12/2024 - MVP Concluído + Deploy 🚀
 
-### 🎯 Objetivo do dia
+### Conquistas
 
-- Implementar MVP funcional do conversor PDF → Imagem
+**Web Worker Funcional**
 
-### ✅ Concluído
+- Criado Worker clássico em `public/ghostscript/worker.js`
+- Interceptação de `console.log` antes de importar `gs.js`
+- Captura de progresso página a página
 
-- Projeto Vue.js 3 + Vite + TypeScript criado
-- Dependências instaladas (@jspawn/ghostscript-wasm, jspdf)
-- Arquivos WASM copiados para public/ghostscript/
-- GhostscriptService.ts implementado com carregamento dinâmico
-- Tipos TypeScript definidos (ghostscript.ts)
-- ConverterView.vue com interface dark mode premium
-- Configurações de DPI (72/150/300/600)
-- Modo colorido e preto & branco
-- Upload com drag & drop
-- Download individual e "Baixar Todas"
-- Spinner animado com feedback visual
-- Git inicializado e primeiro commit
+**Seleção de Páginas**
 
-### 📝 Descobertas técnicas
+- Análise automática do PDF para detectar total de páginas
+- UI com opções "Todas" ou "Intervalo"
+- Parâmetros `-dFirstPage` e `-dLastPage` do Ghostscript
 
-1. Vite não funciona com módulos Emscripten - bypass via public/
-2. `window.Module` é factory function, não objeto
-3. `locateFile` obrigatório para encontrar .wasm
-4. `callMain()` é síncrono e bloqueia UI
-5. Download com blob URL requer appendChild
+**Download ZIP**
 
-### ⏰ Tempo investido
+- Integração com JSZip
+- Download de todas imagens em arquivo único
+- Nomeação automática baseada no PDF original
 
-- ~2h implementação
-- ~30min debugging e ajustes de UI
+**Firebase Deploy**
 
-### 📊 Métricas
+- Configuração de Firebase Hosting
+- GitHub Actions para CI/CD automático
+- Headers COOP/COEP para WASM funcionar
 
-- 8 páginas convertidas em ~10s (após WASM carregado)
-- 20 páginas convertidas em ~25s
-- Interface responsiva e moderna
+**Google Analytics**
+
+- Integração com Firebase Analytics (GA4)
+- Eventos: pdf_loaded, conversion_started/completed, downloads
+- Monitoramento de erros
+
+### Desafios Resolvidos
+
+1. **Workers módulo vs clássico** - Emscripten usa `importScripts()` que só funciona em Workers clássicos
+2. **Callback print ignorado** - `gs.js` usa wrapper interno, solução foi interceptar `console.log`
+3. **Experimento webframeworks** - Firebase exigiu flag experimental para deploy de Vite
+
+### Commits do Dia
+
+- `cffff9c` - fix: intercepta console.log ANTES de importar gs.js
+- `222e7e8` - feat: download de todas imagens como ZIP
+- `1df8117` - feat: progresso visual durante análise de PDF
+- `96aa7cc` - fix: habilita experimento webframeworks no Firebase
+- `e27a641` - feat: integra Google Analytics via Firebase
+
+### URL de Produção
+
+🔗 https://ghostscript-webassembly.web.app
 
 ---
 
-_Adicione novas entradas acima desta linha_
+## Template para Próximas Entradas
+
+```markdown
+## DD/MM/AAAA - Título
+
+### Conquistas
+
+- ...
+
+### Desafios
+
+- ...
+
+### Próximos Passos
+
+- ...
+```

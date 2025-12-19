@@ -1,94 +1,91 @@
-# 📋 Planejamento do Projeto
+# 📋 Planejamento - Ghostscript WebAssembly
 
-## Visão Geral
+## Status: ✅ MVP Concluído + Em Produção
 
-**Projeto**: Aplicação web Vue.js para processamento de PDFs usando Ghostscript WebAssembly  
-**Objetivo**: Oferecer ferramentas de conversão e análise de PDFs 100% no navegador  
-**Diferencial**: Privacidade total - nenhum arquivo é enviado a servidores  
-**Status**: ✅ **MVP Funcional!**
+**URL de Produção:** https://ghostscript-webassembly.web.app
 
 ---
 
-## Métricas Reais
+## Funcionalidades Implementadas
 
-| Métrica             | Valor                 |
-| ------------------- | --------------------- |
-| Tamanho WASM        | ~16MB                 |
-| Tempo inicialização | 10-60s (primeira vez) |
-| DPIs suportados     | 72, 150, 300, 600     |
-| Formatos de saída   | PNG (colorido/P&B)    |
+### Core
 
----
+- [x] **Conversão PDF → Imagem** (PNG)
+- [x] **Web Worker** para processamento em background
+- [x] **Seleção de DPI** (72, 150, 300, 600)
+- [x] **Modo Grayscale** (Preto & Branco)
+- [x] **Seleção de páginas** (Todas ou Intervalo)
 
-## Roadmap de Desenvolvimento
+### UX
 
-### Fase 1: Fundação ✅ CONCLUÍDA
+- [x] **Análise de PDF** com contagem de páginas
+- [x] **Progresso em tempo real** (página a página)
+- [x] **Drag & Drop** para upload
+- [x] **Download individual** de imagens
+- [x] **Download ZIP** de todas imagens
 
-| #   | Tarefa                        | Status |
-| --- | ----------------------------- | ------ |
-| 1.1 | Criar projeto Vue.js 3 + Vite | ✅     |
-| 1.2 | Configurar TypeScript         | ✅     |
-| 1.3 | Integrar Ghostscript WASM     | ✅     |
-| 1.4 | GhostscriptService            | ✅     |
-| 1.5 | Sistema de arquivos virtual   | ✅     |
-| 1.6 | ConverterView                 | ✅     |
+### Infraestrutura
 
-### Fase 2: Conversões ✅ CONCLUÍDA
-
-| #   | Tarefa                       | Status |
-| --- | ---------------------------- | ------ |
-| 2.1 | PDF → Imagem (PNG)           | ✅     |
-| 2.2 | Configuração de DPI          | ✅     |
-| 2.3 | Modo colorido/P&B            | ✅     |
-| 2.4 | Interface premium dark mode  | ✅     |
-| 2.5 | Download individual/todas    | ✅     |
-| 2.6 | Feedback visual de progresso | ✅     |
-
-### Fase 3: Manipulação (Pendente)
-
-| #   | Tarefa              | Status |
-| --- | ------------------- | ------ |
-| 3.1 | Compressão de PDF   | ⬜     |
-| 3.2 | Extração de páginas | ⬜     |
-| 3.3 | Merge de PDFs       | ⬜     |
-| 3.4 | Split de PDFs       | ⬜     |
-
-### Fase 4: UX Avançada (Pendente)
-
-| #   | Tarefa                       | Status |
-| --- | ---------------------------- | ------ |
-| 4.1 | Web Worker (não bloquear UI) | ⬜     |
-| 4.2 | Progresso real-time          | ⬜     |
-| 4.3 | Pré-carregar WASM            | ⬜     |
+- [x] **Firebase Hosting** com deploy automático
+- [x] **GitHub Actions** CI/CD
+- [x] **Google Analytics** para monitoramento
+- [x] **Headers COOP/COEP** para WASM
 
 ---
 
-## Arquivos Criados
+## Stack Tecnológica
+
+| Camada     | Tecnologia         |
+| ---------- | ------------------ |
+| Frontend   | Vue 3 + TypeScript |
+| Build      | Vite               |
+| PDF Engine | Ghostscript WASM   |
+| Hosting    | Firebase Hosting   |
+| Analytics  | Google Analytics 4 |
+| CI/CD      | GitHub Actions     |
+
+---
+
+## Arquitetura
 
 ```
-app/
-├── public/ghostscript/
-│   ├── gs.js       (107KB)
-│   └── gs.wasm     (16MB)
-├── src/
-│   ├── services/ghostscript/
-│   │   └── GhostscriptService.ts
-│   ├── types/
-│   │   └── ghostscript.ts
-│   ├── views/
-│   │   └── ConverterView.vue
-│   └── App.vue
-├── vite.config.ts
-└── package.json
+┌─────────────────────────────────────────────────────────┐
+│                    Vue App (Main Thread)                │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
+│  │ConverterView│  │WorkerService │  │   Firebase     │  │
+│  │   (.vue)    │◄─┤    (.ts)     │  │  Analytics     │  │
+│  └─────────────┘  └──────┬───────┘  └────────────────┘  │
+└──────────────────────────┼──────────────────────────────┘
+                           │ postMessage
+                           ▼
+┌──────────────────────────────────────────────────────────┐
+│                  Web Worker (Background)                 │
+│  ┌────────────────┐  ┌─────────────────────────────────┐ │
+│  │  worker.js     │  │  Ghostscript WASM               │ │
+│  │  (Classic)     │──┤  gs.js + gs.wasm (~16MB)        │ │
+│  └────────────────┘  └─────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Como Rodar
+## Eventos de Analytics
 
-```bash
-cd app
-npm install
-npm run dev
-# Acesse http://localhost:5173
-```
+| Evento                 | Descrição           |
+| ---------------------- | ------------------- |
+| `pdf_loaded`           | PDF selecionado     |
+| `conversion_started`   | Conversão iniciada  |
+| `conversion_completed` | Conversão concluída |
+| `image_downloaded`     | Download individual |
+| `zip_downloaded`       | Download ZIP        |
+| `error_occurred`       | Erro detectado      |
+
+---
+
+## Próximos Passos (Backlog)
+
+- [ ] Compressão de PDF
+- [ ] Merge de PDFs
+- [ ] Split de PDFs
+- [ ] Conversão para outros formatos
+- [ ] PWA / Offline support
