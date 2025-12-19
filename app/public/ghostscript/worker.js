@@ -81,60 +81,59 @@ async function analyzePdf(pdfData) {
     // Escrever PDF de entrada
     gsModule.FS.writeFile('/tmp/analyze.pdf', pdfData);
     
-    // Usar pdfinfo-like approach: renderizar com dispositivo de contagem
-    // -dNODISPLAY -dQUIET -c "(input.pdf) (r) file runpdfbegin pdfpagecount = quit"
-    // Alternativa mais simples: processar e capturar output
     let pageCount = 0;
     
+    // Interceptar console.log para capturar output do GS
+    const originalLog = console.log;
+    console.log = (...args) => {
+      const text = args.join(' ');
+      const num = parseInt(text.trim(), 10);
+      if (!isNaN(num) && num > 0) {
+        pageCount = num;
+      }
+      // Também checar "Processing pages X through Y"
+      const match = text.match(/Processing pages? (\d+) through (\d+)/i);
+      if (match && match[2]) {
+        pageCount = parseInt(match[2], 10);
+      }
+    };
+    
+    // Comando PostScript para contar páginas
     const args = [
       '-dNOPAUSE',
       '-dBATCH',
       '-dSAFER',
       '-dNODISPLAY',
       '-dQUIET',
-      '-dNOPROMPT',
-      '--permit-file-read=/tmp/analyze.pdf',
       '-c',
       '(/tmp/analyze.pdf) (r) file runpdfbegin pdfpagecount = quit',
     ];
     
-    // Capturar output para obter contagem
-    const originalPrint = gsModule.print;
-    gsModule.print = (text) => {
-      const num = parseInt(text.trim(), 10);
-      if (!isNaN(num)) {
-        pageCount = num;
-      }
-    };
-    
     gsModule.callMain(args);
-    gsModule.print = originalPrint;
+    console.log = originalLog;
     
     // Limpar
     try { gsModule.FS.unlink('/tmp/analyze.pdf'); } catch (e) { /* ignore */ }
     
-    // Se não conseguiu via PostScript, tenta brute force com conversão rápida
+    // Se não conseguiu via PostScript, tenta fallback com nullpage
     if (pageCount === 0) {
-      // Fallback: usar conversão com nullpage device
       gsModule.FS.writeFile('/tmp/analyze.pdf', pdfData);
       
-      let fallbackPages = 0;
-      gsModule.print = (text) => {
+      console.log = (...args) => {
+        const text = args.join(' ');
         const match = text.match(/Processing pages? (\d+) through (\d+)/i);
         if (match && match[2]) {
-          fallbackPages = parseInt(match[2], 10);
+          pageCount = parseInt(match[2], 10);
         }
       };
       
       gsModule.callMain([
-        '-dNOPAUSE', '-dBATCH', '-dSAFER', '-dQUIET',
+        '-dNOPAUSE', '-dBATCH', '-dSAFER',
         '-sDEVICE=nullpage',
         '/tmp/analyze.pdf'
       ]);
       
-      gsModule.print = originalPrint;
-      pageCount = fallbackPages;
-      
+      console.log = originalLog;
       try { gsModule.FS.unlink('/tmp/analyze.pdf'); } catch (e) { /* ignore */ }
     }
     
