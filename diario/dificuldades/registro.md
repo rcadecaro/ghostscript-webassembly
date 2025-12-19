@@ -1,193 +1,109 @@
 # ⚠️ Dificuldades e Desafios
 
-Este documento registra os obstáculos identificados através de pesquisa e os que serão encontrados durante o desenvolvimento.
+Este documento registra os obstáculos encontrados durante o desenvolvimento e suas soluções.
 
 ---
 
-## Desafios Identificados (Pesquisa)
+## Desafios Resolvidos ✅
 
-Os seguintes desafios foram identificados através de pesquisa prévia e documentação. As soluções propostas ainda precisam ser validadas durante a implementação.
+### D1: Bundler Vite Quebra Módulo Emscripten ✅
 
-### D1: Bundler Vite Quebra Módulo Emscripten
+**Sintoma:** `ReferenceError: createModule is not defined`
 
-**Status:** 📝 Pesquisado (não implementado)
+**Causa:** Vite otimiza incorretamente o pacote `@jspawn/ghostscript-wasm` (modo MODULARIZE do Emscripten).
 
-**Problema esperado:**
-
-```
-ReferenceError: createModule is not defined
-```
-
-**Causa:**  
-O Vite tenta otimizar e pré-bundlear o pacote `@jspawn/ghostscript-wasm`, mas o módulo foi compilado com Emscripten em modo **MODULARIZE**, gerando uma estrutura especial que o bundler quebra.
-
-**Solução proposta:**  
-Copiar os arquivos estáticos para `public/` e carregar via `<script>` tag dinâmico:
+**Solução:** Copiar arquivos para `public/` e carregar via `<script>` tag:
 
 ```powershell
-New-Item -ItemType Directory -Force -Path "public\ghostscript"
-Copy-Item "node_modules\@jspawn\ghostscript-wasm\gs.js" -Destination "public\ghostscript\"
-Copy-Item "node_modules\@jspawn\ghostscript-wasm\gs.wasm" -Destination "public\ghostscript\"
+Copy-Item "node_modules\@jspawn\ghostscript-wasm\gs.*" -Destination "public\ghostscript\"
 ```
 
 ---
 
-### D2: Módulo Não Inicializa Após Carregar Script
+### D2: Módulo Não Inicializa ✅
 
-**Status:** 📝 Pesquisado (não implementado)
+**Sintoma:** Script carrega mas módulo não inicializa.
 
-**Problema esperado:**  
-Script carrega mas módulo não inicializa.
+**Causa:** `window.Module` é uma factory function, não um objeto.
 
-**Causa:**  
-O `gs.js` está em modo **MODULARIZE** do Emscripten - `Module` é uma factory function, não um objeto.
-
-**Solução proposta:**  
-Chamar `window.Module()` como função:
+**Solução:**
 
 ```typescript
 const module = await factory({
-  locateFile: (path: string) => `/ghostscript/${path}`,
+  locateFile: (path) => `/ghostscript/${path}`,
 });
 ```
 
 ---
 
-### D3: Tempo de Inicialização Longo
+### D3: Sem Feedback de Progresso ✅ (parcial)
 
-**Status:** 📝 Pesquisado (não implementado)
+**Sintoma:** Usuário não sabe em qual página está a conversão.
 
-**Problema esperado:**  
-Primeira conversão demora 10-60 segundos.
+**Causa:** O `callMain()` é síncrono e bloqueia a thread principal. Mesmo interceptando `console.log`, a UI não atualiza.
 
-**Causa:**
+**Descoberta:** O gs.js usa `console.log` diretamente (linha 669), ignorando callbacks `print` do Emscripten.
 
-- Download do `gs.wasm` (~16MB)
-- Compilação do WebAssembly pelo browser
-- Inicialização do runtime Emscripten
-
-**Mitigações propostas:**
-
-- Informar usuário sobre o tempo de carregamento
-- Browser faz cache do WASM para execuções futuras
-- Pré-carregar o módulo em background
+**Solução aplicada:** Spinner animado com mensagens contextuais. **Progresso real-time requer Web Worker** (fase futura).
 
 ---
 
-### D4: Erro ao Salvar PDF com Imagens Grandes
+### D4: Download Individual Não Funcionava ✅
 
-**Status:** 📝 Pesquisado (não implementado)
+**Sintoma:** Clicar no ícone de download não baixava a imagem.
 
-**Problema esperado:**
+**Causa:** `<a download>` com blob URL não funciona em todos os casos.
 
-```
-RangeError: Invalid string length
-```
-
-**Causa:**  
-Imagens em alta resolução (300+ DPI) geram base64 strings muito grandes.
-
-**Soluções propostas:**
-
-1. Converter PNG para JPEG (85% qualidade)
-2. Reduzir escala 50% para DPI ≥ 300
-3. Usar blob output em vez de string
-4. Habilitar compressão no jsPDF
-
----
-
-### D5: Sem Feedback de Progresso Durante Conversão
-
-**Status:** 📝 Pesquisado (não implementado)
-
-**Problema esperado:**  
-Usuário não sabe em qual página está a conversão.
-
-**Descoberta da pesquisa:**  
-O `gs.js` compilado usa `console.log` diretamente, ignorando callbacks `print` do Emscripten.
-
-**Solução proposta:**  
-Interceptar `console.log` durante execução do `callMain()`:
+**Solução:** Usar função JavaScript com `document.body.appendChild()`:
 
 ```typescript
-const originalLog = console.log;
-console.log = (...args: any[]) => {
-  const text = args.join(" ");
-
-  const pageMatch = text.match(/^Page (\d+)$/i);
-  if (pageMatch) {
-    onProgress?.(parseInt(pageMatch[1]), totalPages);
-  }
-
-  originalLog.apply(console, args);
-};
+function handleDownloadSingle(url: string, index: number) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `pagina-${index + 1}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 ```
 
-> ⚠️ **Importante:** NÃO usar `-dQUIET` para receber mensagens de progresso.
+---
+
+### D5: Texto Ilegível no Dark Mode ✅
+
+**Sintoma:** Texto do toggle "Preto & Branco" estava com cor escura.
+
+**Solução:** Mudar `color: var(--text-secondary)` para `color: var(--text-primary)`.
 
 ---
 
-### D6: Bloqueio da Thread Principal
+## Desafios Pendentes
 
-**Status:** ⬜ Pendente
+### D6: UI Bloqueia Durante Conversão
 
-**Descrição:** Operações pesadas do Ghostscript podem congelar a UI.
+**Impacto:** 🟡 Médio  
+**Status:** ⬜ Documentado
 
-**Solução planejada:** Web Worker dedicado
+O `callMain()` bloqueia a thread principal. A UI só atualiza após a conversão terminar.
 
----
-
-### D7: Compatibilidade de Navegadores
-
-**Status:** ⬜ Pendente
-
-**Navegadores alvo:**
-| Navegador | Versão mínima | Status |
-|-----------|---------------|--------|
-| Chrome | 57+ | A validar |
-| Firefox | 52+ | A validar |
-| Safari | 11+ | A validar |
-| Edge | 16+ | A validar |
-| IE | N/A | ❌ Não suportado |
+**Solução planejada:** Web Worker dedicado para processamento em background.
 
 ---
 
-### D8: PDFs Protegidos
+## Especificações Técnicas
 
-**Status:** ⬜ Pendente
+| Item                         | Valor          |
+| ---------------------------- | -------------- |
+| gs.wasm                      | ~16MB          |
+| gs.js                        | ~107KB         |
+| Primeira inicialização       | 10-60 segundos |
+| Memória por página (300 DPI) | ~32MB          |
 
-**Descrição:** PDFs com senha não podem ser processados sem credenciais.
-
-**Parâmetro disponível:** `-sPDFPassword=senha`
-
----
-
-## Especificações Técnicas (Pesquisa)
-
-### Tamanho do Bundle WASM
-
-| Arquivo   | Tamanho |
-| --------- | ------- |
-| `gs.wasm` | ~16MB   |
-| `gs.js`   | ~107KB  |
-
-### Consumo de Memória por DPI (Estimado)
-
-| DPI | Memória por Página A4 |
-| --- | --------------------- |
-| 72  | ~2 MB                 |
-| 150 | ~8 MB                 |
-| 300 | ~32 MB                |
-| 600 | ~128 MB               |
-
-### Configuração Vite Proposta
+### Configuração Vite
 
 ```typescript
-// vite.config.ts
 export default defineConfig({
-  optimizeDeps: {
-    exclude: ["@jspawn/ghostscript-wasm"],
-  },
+  optimizeDeps: { exclude: ["@jspawn/ghostscript-wasm"] },
   server: {
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
@@ -197,18 +113,3 @@ export default defineConfig({
   assetsInclude: ["**/*.wasm"],
 });
 ```
-
----
-
-## Desafios Encontrados (Durante Desenvolvimento)
-
-_Esta seção será preenchida conforme problemas forem encontrados durante a implementação._
-
----
-
-## Legenda de Status
-
-- 📝 Pesquisado (identificado, não implementado)
-- ⬜ Pendente
-- 🔄 Em análise
-- ✅ Resolvido
