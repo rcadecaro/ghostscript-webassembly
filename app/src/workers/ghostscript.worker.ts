@@ -62,10 +62,11 @@ function handleGsOutput(text: string) {
 async function initGhostscript() {
   try {
     // Importar o script do Ghostscript
-    // @ts-expect-error - importScripts é global em Web Workers
+    // @ts-ignore - importScripts é global em Web Workers
     importScripts('/ghostscript/gs.js');
     
-    // @ts-expect-error - Module é global após importScripts
+    // Module é global após importScripts
+    // @ts-ignore
     const factory = self.Module;
     
     if (typeof factory !== 'function') {

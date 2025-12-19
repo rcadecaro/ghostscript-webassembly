@@ -5,6 +5,9 @@
  * Permite conversão em background sem bloquear a UI
  */
 
+// Importar Worker usando sintaxe do Vite
+import GhostscriptWorker from '../../workers/ghostscript.worker?worker';
+
 export interface ConvertOptions {
   dpi: 72 | 150 | 300 | 600;
   grayscale?: boolean;
@@ -104,11 +107,8 @@ export async function initGhostscriptWorker(): Promise<void> {
     initResolve = resolve;
     initReject = reject;
     
-    // Criar Worker
-    worker = new Worker(
-      new URL('../workers/ghostscript.worker.ts', import.meta.url),
-      { type: 'module' }
-    );
+    // Criar Worker usando sintaxe Vite
+    worker = new GhostscriptWorker();
     
     // Handler de mensagens
     worker.onmessage = handleWorkerMessage;
