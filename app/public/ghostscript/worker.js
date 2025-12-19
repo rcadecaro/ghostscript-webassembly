@@ -1,47 +1,21 @@
 /**
- * Ghostscript Web Worker
+ * Ghostscript Web Worker (Classic Worker)
  * 
- * Processa PDFs em background sem bloquear a thread principal
+ * Este arquivo é carregado como Worker clássico para suportar importScripts.
+ * Processa PDFs em background sem bloquear a thread principal.
  */
 
-// Tipagem para mensagens
-interface WorkerMessage {
-  type: 'init' | 'convert';
-  payload?: {
-    pdfData?: Uint8Array;
-    dpi?: number;
-    grayscale?: boolean;
-  };
-}
-
-interface WorkerResponse {
-  type: 'ready' | 'progress' | 'complete' | 'error';
-  payload?: {
-    current?: number;
-    total?: number;
-    images?: Uint8Array[];
-    error?: string;
-  };
-}
-
 // Estado do módulo
-let gsModule: any = null;
-
-// Função para enviar mensagens para a thread principal
-function postResponse(response: WorkerResponse) {
-  self.postMessage(response);
-}
-
-// Variável para rastrear total de páginas
+let gsModule = null;
 let detectedTotalPages = 0;
 
 // Processar output do Ghostscript para progresso
-function handleGsOutput(text: string) {
+function handleGsOutput(text) {
   // Detectar total de páginas
   const pagesMatch = text.match(/Processing pages? (\d+) through (\d+)/i);
   if (pagesMatch && pagesMatch[2]) {
     detectedTotalPages = parseInt(pagesMatch[2], 10);
-    postResponse({ 
+    self.postMessage({ 
       type: 'progress', 
       payload: { current: 0, total: detectedTotalPages }
     });
@@ -51,7 +25,7 @@ function handleGsOutput(text: string) {
   const pageMatch = text.match(/^Page (\d+)$/i);
   if (pageMatch && pageMatch[1]) {
     const currentPage = parseInt(pageMatch[1], 10);
-    postResponse({ 
+    self.postMessage({ 
       type: 'progress', 
       payload: { current: currentPage, total: detectedTotalPages }
     });
@@ -61,12 +35,9 @@ function handleGsOutput(text: string) {
 // Carregar Ghostscript dentro do Worker
 async function initGhostscript() {
   try {
-    // Importar o script do Ghostscript
-    // @ts-ignore - importScripts é global em Web Workers
+    // Em workers clássicos, importScripts funciona
     importScripts('/ghostscript/gs.js');
     
-    // Module é global após importScripts
-    // @ts-ignore
     const factory = self.Module;
     
     if (typeof factory !== 'function') {
@@ -74,31 +45,30 @@ async function initGhostscript() {
     }
     
     gsModule = await factory({
-      locateFile: (path: string) => `/ghostscript/${path}`,
-      print: (text: string) => {
-        // Capturar mensagens de progresso
+      locateFile: (path) => `/ghostscript/${path}`,
+      print: (text) => {
         handleGsOutput(text);
       },
-      printErr: (text: string) => {
+      printErr: (text) => {
         console.error('[GS Worker Error]', text);
       },
     });
     
-    postResponse({ type: 'ready' });
+    self.postMessage({ type: 'ready' });
     console.log('[GS Worker] Módulo inicializado!');
     
   } catch (error) {
-    postResponse({ 
+    self.postMessage({ 
       type: 'error', 
-      payload: { error: error instanceof Error ? error.message : 'Erro ao inicializar' }
+      payload: { error: error.message || 'Erro ao inicializar' }
     });
   }
 }
 
 // Converter PDF para imagens
-async function convertPdf(pdfData: Uint8Array, dpi: number, grayscale: boolean) {
+async function convertPdf(pdfData, dpi, grayscale) {
   if (!gsModule) {
-    postResponse({ 
+    self.postMessage({ 
       type: 'error', 
       payload: { error: 'Módulo não inicializado' }
     });
@@ -109,8 +79,8 @@ async function convertPdf(pdfData: Uint8Array, dpi: number, grayscale: boolean) 
     detectedTotalPages = 0;
     
     // Criar diretórios
-    try { gsModule.FS.mkdir('/tmp'); } catch { /* já existe */ }
-    try { gsModule.FS.mkdir('/tmp/output'); } catch { /* já existe */ }
+    try { gsModule.FS.mkdir('/tmp'); } catch (e) { /* já existe */ }
+    try { gsModule.FS.mkdir('/tmp/output'); } catch (e) { /* já existe */ }
     
     // Escrever PDF de entrada
     gsModule.FS.writeFile('/tmp/input.pdf', pdfData);
@@ -138,41 +108,40 @@ async function convertPdf(pdfData: Uint8Array, dpi: number, grayscale: boolean) 
     
     // Ler arquivos de saída
     const files = gsModule.FS.readdir('/tmp/output')
-      .filter((f: string) => f.startsWith('page-') && f.endsWith('.png'))
-      .sort((a: string, b: string) => {
+      .filter((f) => f.startsWith('page-') && f.endsWith('.png'))
+      .sort((a, b) => {
         const numA = parseInt(a.match(/\d+/)?.[0] || '0');
         const numB = parseInt(b.match(/\d+/)?.[0] || '0');
         return numA - numB;
       });
     
-    const images = files.map((f: string) => {
+    const images = files.map((f) => {
       const data = gsModule.FS.readFile(`/tmp/output/${f}`);
-      // Criar cópia do array para transferir
       return new Uint8Array(data);
     });
     
     // Limpar arquivos temporários
-    files.forEach((f: string) => {
-      try { gsModule.FS.unlink(`/tmp/output/${f}`); } catch { /* ignore */ }
+    files.forEach((f) => {
+      try { gsModule.FS.unlink(`/tmp/output/${f}`); } catch (e) { /* ignore */ }
     });
-    try { gsModule.FS.unlink('/tmp/input.pdf'); } catch { /* ignore */ }
+    try { gsModule.FS.unlink('/tmp/input.pdf'); } catch (e) { /* ignore */ }
     
     // Enviar resultado
-    postResponse({ 
+    self.postMessage({ 
       type: 'complete', 
       payload: { images }
     });
     
   } catch (error) {
-    postResponse({ 
+    self.postMessage({ 
       type: 'error', 
-      payload: { error: error instanceof Error ? error.message : 'Erro na conversão' }
+      payload: { error: error.message || 'Erro na conversão' }
     });
   }
 }
 
 // Handler de mensagens
-self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
+self.onmessage = async (event) => {
   const { type, payload } = event.data;
   
   switch (type) {
@@ -191,6 +160,3 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       break;
   }
 };
-
-// Exportar para TypeScript
-export {};

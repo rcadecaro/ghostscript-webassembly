@@ -3,10 +3,10 @@
  * 
  * Serviço que gerencia o Web Worker para processamento de PDFs
  * Permite conversão em background sem bloquear a UI
+ * 
+ * NOTA: Usa Worker clássico (não-módulo) para suportar importScripts
+ * que é necessário para carregar o gs.js do Emscripten
  */
-
-// Importar Worker usando sintaxe do Vite
-import GhostscriptWorker from '../../workers/ghostscript.worker?worker';
 
 export interface ConvertOptions {
   dpi: 72 | 150 | 300 | 600;
@@ -107,8 +107,9 @@ export async function initGhostscriptWorker(): Promise<void> {
     initResolve = resolve;
     initReject = reject;
     
-    // Criar Worker usando sintaxe Vite
-    worker = new GhostscriptWorker();
+    // Usar Worker clássico do diretório public
+    // Isso é necessário porque importScripts não funciona em module workers
+    worker = new Worker('/ghostscript/worker.js');
     
     // Handler de mensagens
     worker.onmessage = handleWorkerMessage;
