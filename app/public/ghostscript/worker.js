@@ -3,6 +3,9 @@
  * 
  * Este arquivo é carregado como Worker clássico para suportar importScripts.
  * Processa PDFs em background sem bloquear a thread principal.
+ * 
+ * IMPORTANTE: O gs.js usa console.log internamente, ignorando callbacks.
+ * Por isso interceptamos console.log ANTES de importar o gs.js.
  */
 
 // Estado do módulo
@@ -11,7 +14,11 @@ let detectedTotalPages = 0;
 let isAnalyzing = false;
 let analyzedPageCount = 0;
 
-// Processar output do Ghostscript para progresso
+// Guardar console.log original
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+
+// Handler de output do Ghostscript
 function handleGsOutput(text) {
   // Detectar total de páginas - "Processing pages X through Y"
   const pagesMatch = text.match(/Processing pages? (\d+) through (\d+)/i);
@@ -19,7 +26,6 @@ function handleGsOutput(text) {
     const count = parseInt(pagesMatch[2], 10);
     detectedTotalPages = count;
     
-    // Se estamos analisando, salvar contagem
     if (isAnalyzing) {
       analyzedPageCount = count;
     } else {
@@ -43,13 +49,32 @@ function handleGsOutput(text) {
   // Detectar número direto (do pdfpagecount)
   const numMatch = text.trim().match(/^(\d+)$/);
   if (numMatch && isAnalyzing) {
-    analyzedPageCount = parseInt(numMatch[1], 10);
+    const num = parseInt(numMatch[1], 10);
+    if (num > 0) {
+      analyzedPageCount = num;
+    }
   }
 }
+
+// INTERCEPTAR console.log ANTES de importar gs.js
+console.log = (...args) => {
+  const text = args.join(' ');
+  
+  // Processar output do GS
+  handleGsOutput(text);
+  
+  // Também logar no console real (para debug)
+  originalConsoleLog.apply(console, ['[GS]', ...args]);
+};
+
+console.error = (...args) => {
+  originalConsoleError.apply(console, ['[GS Error]', ...args]);
+};
 
 // Carregar Ghostscript dentro do Worker
 async function initGhostscript() {
   try {
+    // Importar gs.js - agora console.log já está interceptado
     importScripts('/ghostscript/gs.js');
     
     const factory = self.Module;
@@ -60,16 +85,10 @@ async function initGhostscript() {
     
     gsModule = await factory({
       locateFile: (path) => `/ghostscript/${path}`,
-      print: (text) => {
-        handleGsOutput(text);
-      },
-      printErr: (text) => {
-        console.error('[GS Worker Error]', text);
-      },
     });
     
     self.postMessage({ type: 'ready' });
-    console.log('[GS Worker] Módulo inicializado!');
+    originalConsoleLog('[GS Worker] Módulo inicializado!');
     
   } catch (error) {
     self.postMessage({ 
@@ -99,8 +118,7 @@ async function analyzePdf(pdfData) {
     // Escrever PDF de entrada
     gsModule.FS.writeFile('/tmp/analyze.pdf', pdfData);
     
-    // Usar nullpage device - mais confiável que PostScript
-    // Isso dispara "Processing pages 1 through X" que capturamos
+    // Usar nullpage device - dispara "Processing pages 1 through X"
     gsModule.callMain([
       '-dNOPAUSE', 
       '-dBATCH', 
@@ -113,6 +131,8 @@ async function analyzePdf(pdfData) {
     try { gsModule.FS.unlink('/tmp/analyze.pdf'); } catch (e) { /* ignore */ }
     
     isAnalyzing = false;
+    
+    originalConsoleLog('[GS Worker] Análise concluída:', analyzedPageCount, 'páginas');
     
     self.postMessage({ 
       type: 'analyzed', 
@@ -198,7 +218,7 @@ async function convertPdf(pdfData, dpi, grayscale, firstPage, lastPage) {
     });
     try { gsModule.FS.unlink('/tmp/input.pdf'); } catch (e) { /* ignore */ }
     
-    // Enviar resultado com info de range
+    // Enviar resultado
     self.postMessage({ 
       type: 'complete', 
       payload: { 
