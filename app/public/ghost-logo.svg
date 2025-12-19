@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Ghostscript Ghost Logo - Simplified -->
+  <defs>
+    <linearGradient id="ghostGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Ghost body -->
+  <path fill="url(#ghostGradient)" d="M50 10 C25 10, 15 30, 15 50 L15 85 C15 88, 18 90, 22 87 C26 84, 30 87, 34 90 C38 87, 42 84, 46 87 C50 90, 54 87, 58 84 C62 87, 66 90, 70 87 C74 84, 78 87, 82 90 C86 87, 88 85, 85 82 L85 50 C85 30, 75 10, 50 10 Z"/>
+  <!-- Eyes -->
+  <ellipse cx="35" cy="45" rx="8" ry="10" fill="#1e1b4b"/>
+  <ellipse cx="65" cy="45" rx="8" ry="10" fill="#1e1b4b"/>
+  <!-- Eye highlights -->
+  <circle cx="38" cy="42" r="3" fill="#fff"/>
+  <circle cx="68" cy="42" r="3" fill="#fff"/>
+</svg>
