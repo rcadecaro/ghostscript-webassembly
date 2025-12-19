@@ -36,6 +36,7 @@ let initResolve: (() => void) | null = null;
 let initReject: ((error: Error) => void) | null = null;
 let analyzeResolve: ((result: AnalyzeResult) => void) | null = null;
 let analyzeReject: ((error: Error) => void) | null = null;
+let analyzeProgressCallback: ((current: number, total: number) => void) | null = null;
 let convertResolve: ((result: ConvertResult) => void) | null = null;
 let convertReject: ((error: Error) => void) | null = null;
 let progressCallback: ((current: number, total: number) => void) | null = null;
@@ -62,6 +63,13 @@ function handleWorkerMessage(event: MessageEvent) {
       if (analyzeResolve && payload) {
         analyzeResolve({ pageCount: payload.pageCount || 0 });
         analyzeResolve = null;
+        analyzeProgressCallback = null;
+      }
+      break;
+    
+    case 'analyze_progress':
+      if (analyzeProgressCallback && payload) {
+        analyzeProgressCallback(payload.current || 0, payload.total || 0);
       }
       break;
       
@@ -155,7 +163,10 @@ export function isWorkerReady(): boolean {
 /**
  * Analisa PDF para obter número de páginas
  */
-export async function analyzePdf(pdfData: Uint8Array): Promise<AnalyzeResult> {
+export async function analyzePdf(
+  pdfData: Uint8Array,
+  onProgress?: (current: number, total: number) => void
+): Promise<AnalyzeResult> {
   if (!isInitialized) {
     await initGhostscriptWorker();
   }
@@ -167,6 +178,7 @@ export async function analyzePdf(pdfData: Uint8Array): Promise<AnalyzeResult> {
   return new Promise((resolve, reject) => {
     analyzeResolve = resolve;
     analyzeReject = reject;
+    analyzeProgressCallback = onProgress || null;
     
     worker!.postMessage({
       type: 'analyze',

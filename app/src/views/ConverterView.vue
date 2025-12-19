@@ -24,6 +24,7 @@ const grayscale = ref(false);
 
 // Análise de páginas
 const isAnalyzing = ref(false);
+const analyzeProgress = ref({ current: 0, total: 0 });
 const totalPages = ref(0);
 const pageMode = ref<'all' | 'range'>('all');
 const firstPage = ref(1);
@@ -98,10 +99,13 @@ async function loadAndAnalyzeFile(file: File) {
     
     // Analisar PDF para obter número de páginas
     isAnalyzing.value = true;
+    analyzeProgress.value = { current: 0, total: 0 };
     const buffer = await file.arrayBuffer();
     pdfDataCache.value = new Uint8Array(buffer);
     
-    const result = await analyzePdf(pdfDataCache.value);
+    const result = await analyzePdf(pdfDataCache.value, (current, total) => {
+      analyzeProgress.value = { current, total };
+    });
     totalPages.value = result.pageCount;
     firstPage.value = 1;
     lastPage.value = result.pageCount;
@@ -378,7 +382,12 @@ function clearFile() {
         <!-- Analyzing indicator -->
         <div v-if="isAnalyzing" class="analyzing-indicator">
           <span class="analyzing-spinner"></span>
-          Analisando documento...
+          <span v-if="analyzeProgress.total > 0">
+            Analisando página {{ analyzeProgress.current }} de {{ analyzeProgress.total }}...
+          </span>
+          <span v-else>
+            Iniciando análise...
+          </span>
         </div>
 
         <button class="convert-btn" @click="handleConvert">

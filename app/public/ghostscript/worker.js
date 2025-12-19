@@ -28,6 +28,11 @@ function handleGsOutput(text) {
     
     if (isAnalyzing) {
       analyzedPageCount = count;
+      // Enviar total detectado durante análise
+      self.postMessage({ 
+        type: 'analyze_progress', 
+        payload: { current: 0, total: count }
+      });
     } else {
       self.postMessage({ 
         type: 'progress', 
@@ -36,14 +41,23 @@ function handleGsOutput(text) {
     }
   }
   
-  // Detectar página atual durante conversão
+  // Detectar página atual
   const pageMatch = text.match(/^Page (\d+)$/i);
-  if (pageMatch && pageMatch[1] && !isAnalyzing) {
+  if (pageMatch && pageMatch[1]) {
     const currentPage = parseInt(pageMatch[1], 10);
-    self.postMessage({ 
-      type: 'progress', 
-      payload: { current: currentPage, total: detectedTotalPages }
-    });
+    
+    if (isAnalyzing) {
+      // Enviar progresso durante análise
+      self.postMessage({ 
+        type: 'analyze_progress', 
+        payload: { current: currentPage, total: detectedTotalPages }
+      });
+    } else {
+      self.postMessage({ 
+        type: 'progress', 
+        payload: { current: currentPage, total: detectedTotalPages }
+      });
+    }
   }
   
   // Detectar número direto (do pdfpagecount)
