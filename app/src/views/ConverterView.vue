@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import JSZip from 'jszip';
 import { 
   initGhostscriptWorker, 
   convertPdfWithWorker, 
@@ -159,12 +160,49 @@ function handleDownloadSingle(url: string, index: number) {
   document.body.removeChild(a);
 }
 
-function handleDownloadAll() {
-  resultImages.value.forEach((url, index) => {
-    setTimeout(() => {
-      handleDownloadSingle(url, index);
-    }, index * 100);
-  });
+const isZipping = ref(false);
+
+async function handleDownloadAll() {
+  if (resultImages.value.length === 0) return;
+  
+  isZipping.value = true;
+  
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder('paginas');
+    
+    if (!folder) throw new Error('Erro ao criar pasta no ZIP');
+    
+    // Baixar cada imagem e adicionar ao ZIP
+    for (let i = 0; i < resultImages.value.length; i++) {
+      const url = resultImages.value[i];
+      if (!url) continue;
+      const response = await fetch(url);
+      const blob = await response.blob();
+      folder.file(`pagina-${(i + 1).toString().padStart(3, '0')}.png`, blob);
+    }
+    
+    // Gerar ZIP
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    
+    // Criar nome do arquivo baseado no PDF original
+    const baseName = selectedFile.value?.name.replace('.pdf', '') || 'imagens';
+    
+    // Download do ZIP
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = `${baseName}-imagens.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    
+  } catch (err) {
+    console.error('Erro ao criar ZIP:', err);
+    error.value = 'Erro ao criar arquivo ZIP';
+  } finally {
+    isZipping.value = false;
+  }
 }
 
 function clearFile() {
