@@ -5,18 +5,25 @@
  * Permite conversão em background sem bloquear a UI
  * 
  * NOTA: Usa Worker clássico (não-módulo) para suportar importScripts
- * que é necessário para carregar o gs.js do Emscripten
  */
 
 export interface ConvertOptions {
   dpi: 72 | 150 | 300 | 600;
   grayscale?: boolean;
+  firstPage?: number;
+  lastPage?: number;
   onProgress?: (current: number, total: number) => void;
 }
 
 export interface ConvertResult {
   images: Uint8Array[];
   totalPages: number;
+  firstPage: number;
+  lastPage: number;
+}
+
+export interface AnalyzeResult {
+  pageCount: number;
 }
 
 // Worker instance
@@ -27,6 +34,8 @@ let isInitializing = false;
 // Callbacks pendentes
 let initResolve: (() => void) | null = null;
 let initReject: ((error: Error) => void) | null = null;
+let analyzeResolve: ((result: AnalyzeResult) => void) | null = null;
+let analyzeReject: ((error: Error) => void) | null = null;
 let convertResolve: ((result: ConvertResult) => void) | null = null;
 let convertReject: ((error: Error) => void) | null = null;
 let progressCallback: ((current: number, total: number) => void) | null = null;
@@ -47,6 +56,14 @@ function handleWorkerMessage(event: MessageEvent) {
         initResolve = null;
       }
       break;
+    
+    case 'analyzed':
+      console.log('[GS Service] PDF analisado:', payload?.pageCount, 'páginas');
+      if (analyzeResolve && payload) {
+        analyzeResolve({ pageCount: payload.pageCount || 0 });
+        analyzeResolve = null;
+      }
+      break;
       
     case 'progress':
       if (progressCallback && payload) {
@@ -60,6 +77,8 @@ function handleWorkerMessage(event: MessageEvent) {
         convertResolve({
           images: payload.images,
           totalPages: payload.images.length,
+          firstPage: payload.firstPage || 1,
+          lastPage: payload.lastPage || payload.images.length,
         });
         convertResolve = null;
         progressCallback = null;
@@ -73,6 +92,10 @@ function handleWorkerMessage(event: MessageEvent) {
       if (initReject) {
         initReject(error);
         initReject = null;
+      }
+      if (analyzeReject) {
+        analyzeReject(error);
+        analyzeReject = null;
       }
       if (convertReject) {
         convertReject(error);
@@ -90,7 +113,6 @@ export async function initGhostscriptWorker(): Promise<void> {
   if (isInitialized) return;
   
   if (isInitializing) {
-    // Aguardar inicialização em andamento
     return new Promise((resolve) => {
       const checkInterval = setInterval(() => {
         if (isInitialized) {
@@ -107,11 +129,7 @@ export async function initGhostscriptWorker(): Promise<void> {
     initResolve = resolve;
     initReject = reject;
     
-    // Usar Worker clássico do diretório public
-    // Isso é necessário porque importScripts não funciona em module workers
     worker = new Worker('/ghostscript/worker.js');
-    
-    // Handler de mensagens
     worker.onmessage = handleWorkerMessage;
     
     worker.onerror = (error) => {
@@ -123,7 +141,6 @@ export async function initGhostscriptWorker(): Promise<void> {
       }
     };
     
-    // Enviar comando de inicialização
     worker.postMessage({ type: 'init' });
   });
 }
@@ -136,13 +153,35 @@ export function isWorkerReady(): boolean {
 }
 
 /**
+ * Analisa PDF para obter número de páginas
+ */
+export async function analyzePdf(pdfData: Uint8Array): Promise<AnalyzeResult> {
+  if (!isInitialized) {
+    await initGhostscriptWorker();
+  }
+  
+  if (!worker) {
+    throw new Error('Worker não disponível');
+  }
+  
+  return new Promise((resolve, reject) => {
+    analyzeResolve = resolve;
+    analyzeReject = reject;
+    
+    worker!.postMessage({
+      type: 'analyze',
+      payload: { pdfData },
+    });
+  });
+}
+
+/**
  * Converte PDF para imagens usando o Worker
  */
 export async function convertPdfWithWorker(
   pdfData: Uint8Array,
   options: ConvertOptions
 ): Promise<ConvertResult> {
-  // Inicializar se necessário
   if (!isInitialized) {
     await initGhostscriptWorker();
   }
@@ -156,13 +195,14 @@ export async function convertPdfWithWorker(
     convertReject = reject;
     progressCallback = options.onProgress || null;
     
-    // Enviar PDF para conversão
     worker!.postMessage({
       type: 'convert',
       payload: {
         pdfData,
         dpi: options.dpi,
         grayscale: options.grayscale ?? false,
+        firstPage: options.firstPage,
+        lastPage: options.lastPage,
       },
     });
   });

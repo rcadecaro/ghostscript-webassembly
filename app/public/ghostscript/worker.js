@@ -35,7 +35,6 @@ function handleGsOutput(text) {
 // Carregar Ghostscript dentro do Worker
 async function initGhostscript() {
   try {
-    // Em workers clássicos, importScripts funciona
     importScripts('/ghostscript/gs.js');
     
     const factory = self.Module;
@@ -65,8 +64,95 @@ async function initGhostscript() {
   }
 }
 
-// Converter PDF para imagens
-async function convertPdf(pdfData, dpi, grayscale) {
+// Analisar PDF para obter metadados (número de páginas)
+async function analyzePdf(pdfData) {
+  if (!gsModule) {
+    self.postMessage({ 
+      type: 'error', 
+      payload: { error: 'Módulo não inicializado' }
+    });
+    return;
+  }
+  
+  try {
+    // Criar diretórios
+    try { gsModule.FS.mkdir('/tmp'); } catch (e) { /* já existe */ }
+    
+    // Escrever PDF de entrada
+    gsModule.FS.writeFile('/tmp/analyze.pdf', pdfData);
+    
+    // Usar pdfinfo-like approach: renderizar com dispositivo de contagem
+    // -dNODISPLAY -dQUIET -c "(input.pdf) (r) file runpdfbegin pdfpagecount = quit"
+    // Alternativa mais simples: processar e capturar output
+    let pageCount = 0;
+    
+    const args = [
+      '-dNOPAUSE',
+      '-dBATCH',
+      '-dSAFER',
+      '-dNODISPLAY',
+      '-dQUIET',
+      '-dNOPROMPT',
+      '--permit-file-read=/tmp/analyze.pdf',
+      '-c',
+      '(/tmp/analyze.pdf) (r) file runpdfbegin pdfpagecount = quit',
+    ];
+    
+    // Capturar output para obter contagem
+    const originalPrint = gsModule.print;
+    gsModule.print = (text) => {
+      const num = parseInt(text.trim(), 10);
+      if (!isNaN(num)) {
+        pageCount = num;
+      }
+    };
+    
+    gsModule.callMain(args);
+    gsModule.print = originalPrint;
+    
+    // Limpar
+    try { gsModule.FS.unlink('/tmp/analyze.pdf'); } catch (e) { /* ignore */ }
+    
+    // Se não conseguiu via PostScript, tenta brute force com conversão rápida
+    if (pageCount === 0) {
+      // Fallback: usar conversão com nullpage device
+      gsModule.FS.writeFile('/tmp/analyze.pdf', pdfData);
+      
+      let fallbackPages = 0;
+      gsModule.print = (text) => {
+        const match = text.match(/Processing pages? (\d+) through (\d+)/i);
+        if (match && match[2]) {
+          fallbackPages = parseInt(match[2], 10);
+        }
+      };
+      
+      gsModule.callMain([
+        '-dNOPAUSE', '-dBATCH', '-dSAFER', '-dQUIET',
+        '-sDEVICE=nullpage',
+        '/tmp/analyze.pdf'
+      ]);
+      
+      gsModule.print = originalPrint;
+      pageCount = fallbackPages;
+      
+      try { gsModule.FS.unlink('/tmp/analyze.pdf'); } catch (e) { /* ignore */ }
+    }
+    
+    self.postMessage({ 
+      type: 'analyzed', 
+      payload: { pageCount }
+    });
+    
+  } catch (error) {
+    self.postMessage({ 
+      type: 'error', 
+      payload: { error: error.message || 'Erro ao analisar PDF' }
+    });
+  }
+}
+
+// Converter PDF para imagens com suporte a range de páginas
+async function convertPdf(pdfData, dpi, grayscale, firstPage, lastPage) {
   if (!gsModule) {
     self.postMessage({ 
       type: 'error', 
@@ -95,9 +181,18 @@ async function convertPdf(pdfData, dpi, grayscale) {
       `-r${dpi}`,
       '-dTextAlphaBits=4',
       '-dGraphicsAlphaBits=4',
-      '-sOutputFile=/tmp/output/page-%d.png',
-      '/tmp/input.pdf',
     ];
+    
+    // Adicionar range de páginas se especificado
+    if (firstPage && firstPage > 0) {
+      args.push(`-dFirstPage=${firstPage}`);
+    }
+    if (lastPage && lastPage > 0) {
+      args.push(`-dLastPage=${lastPage}`);
+    }
+    
+    args.push('-sOutputFile=/tmp/output/page-%d.png');
+    args.push('/tmp/input.pdf');
     
     // Executar conversão
     const exitCode = gsModule.callMain(args);
@@ -126,10 +221,14 @@ async function convertPdf(pdfData, dpi, grayscale) {
     });
     try { gsModule.FS.unlink('/tmp/input.pdf'); } catch (e) { /* ignore */ }
     
-    // Enviar resultado
+    // Enviar resultado com info de range
     self.postMessage({ 
       type: 'complete', 
-      payload: { images }
+      payload: { 
+        images,
+        firstPage: firstPage || 1,
+        lastPage: lastPage || images.length
+      }
     });
     
   } catch (error) {
@@ -149,12 +248,20 @@ self.onmessage = async (event) => {
       await initGhostscript();
       break;
       
+    case 'analyze':
+      if (payload?.pdfData) {
+        await analyzePdf(payload.pdfData);
+      }
+      break;
+      
     case 'convert':
       if (payload?.pdfData) {
         await convertPdf(
           payload.pdfData, 
           payload.dpi || 150, 
-          payload.grayscale ?? false
+          payload.grayscale ?? false,
+          payload.firstPage,
+          payload.lastPage
         );
       }
       break;

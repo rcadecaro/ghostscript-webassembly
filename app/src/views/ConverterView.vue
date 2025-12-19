@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { 
   initGhostscriptWorker, 
   convertPdfWithWorker, 
+  analyzePdf,
   uint8ArrayToObjectUrl,
   isWorkerReady 
 } from '@/services/ghostscript/GhostscriptWorkerService';
@@ -19,6 +20,14 @@ const isDragging = ref(false);
 // Opções de conversão
 const dpi = ref<72 | 150 | 300 | 600>(150);
 const grayscale = ref(false);
+
+// Análise de páginas
+const isAnalyzing = ref(false);
+const totalPages = ref(0);
+const pageMode = ref<'all' | 'range'>('all');
+const firstPage = ref(1);
+const lastPage = ref(1);
+const pdfDataCache = ref<Uint8Array | null>(null);
 
 // Computed
 const progressPercent = computed(() => {
@@ -60,27 +69,23 @@ function handleDrop(event: DragEvent) {
   isDragging.value = false;
   const files = event.dataTransfer?.files;
   if (files && files[0] && files[0].type === 'application/pdf') {
-    selectedFile.value = files[0];
-    resultImages.value = [];
-    error.value = null;
+    loadAndAnalyzeFile(files[0]);
   }
 }
 
 async function handleFileSelect(event: Event) {
   const input = event.target as HTMLInputElement;
   if (input.files && input.files[0]) {
-    selectedFile.value = input.files[0];
-    resultImages.value = [];
-    error.value = null;
+    await loadAndAnalyzeFile(input.files[0]);
   }
 }
 
-async function handleConvert() {
-  if (!selectedFile.value) return;
-  
-  error.value = null;
+async function loadAndAnalyzeFile(file: File) {
+  selectedFile.value = file;
   resultImages.value = [];
-  progress.value = { current: 0, total: 0 };
+  error.value = null;
+  totalPages.value = 0;
+  pageMode.value = 'all';
   
   try {
     // Inicializar Worker se necessário
@@ -90,14 +95,44 @@ async function handleConvert() {
       isLoading.value = false;
     }
     
+    // Analisar PDF para obter número de páginas
+    isAnalyzing.value = true;
+    const buffer = await file.arrayBuffer();
+    pdfDataCache.value = new Uint8Array(buffer);
+    
+    const result = await analyzePdf(pdfDataCache.value);
+    totalPages.value = result.pageCount;
+    firstPage.value = 1;
+    lastPage.value = result.pageCount;
+    
+  } catch (err) {
+    console.error('Erro ao analisar PDF:', err);
+    error.value = err instanceof Error ? err.message : 'Erro ao analisar PDF';
+  } finally {
+    isAnalyzing.value = false;
+  }
+}
+
+async function handleConvert() {
+  if (!selectedFile.value || !pdfDataCache.value) return;
+  
+  error.value = null;
+  resultImages.value = [];
+  progress.value = { current: 0, total: 0 };
+  
+  try {
     isConverting.value = true;
-    const buffer = await selectedFile.value.arrayBuffer();
-    const pdfData = new Uint8Array(buffer);
+    
+    // Determinar range de páginas
+    const convertFirstPage = pageMode.value === 'range' ? firstPage.value : undefined;
+    const convertLastPage = pageMode.value === 'range' ? lastPage.value : undefined;
     
     // Usar Worker para conversão (não bloqueia UI!)
-    const result = await convertPdfWithWorker(pdfData, {
+    const result = await convertPdfWithWorker(pdfDataCache.value, {
       dpi: dpi.value,
       grayscale: grayscale.value,
+      firstPage: convertFirstPage,
+      lastPage: convertLastPage,
       onProgress: (current, total) => {
         progress.value = { current, total };
       },
@@ -250,6 +285,62 @@ function clearFile() {
               Converter para Preto & Branco
             </span>
           </label>
+        </div>
+
+        <!-- Page Range Selector -->
+        <div v-if="totalPages > 0" class="setting-group page-selector">
+          <label class="setting-label">
+            <span class="label-icon">📄</span>
+            Páginas ({{ totalPages }} detectadas)
+          </label>
+          
+          <div class="page-mode-selector">
+            <button 
+              :class="['mode-btn', { active: pageMode === 'all' }]"
+              @click="pageMode = 'all'"
+            >
+              Todas
+            </button>
+            <button 
+              :class="['mode-btn', { active: pageMode === 'range' }]"
+              @click="pageMode = 'range'"
+            >
+              Intervalo
+            </button>
+          </div>
+          
+          <div v-if="pageMode === 'range'" class="range-inputs">
+            <div class="range-field">
+              <label>De:</label>
+              <input 
+                type="number" 
+                v-model.number="firstPage" 
+                :min="1" 
+                :max="lastPage"
+                class="page-input"
+              />
+            </div>
+            <span class="range-separator">→</span>
+            <div class="range-field">
+              <label>Até:</label>
+              <input 
+                type="number" 
+                v-model.number="lastPage" 
+                :min="firstPage" 
+                :max="totalPages"
+                class="page-input"
+              />
+            </div>
+            <span class="range-info">
+              ({{ lastPage - firstPage + 1 }} página{{ lastPage - firstPage !== 0 ? 's' : '' }})
+            </span>
+          </div>
+        </div>
+        
+        <!-- Analyzing indicator -->
+        <div v-if="isAnalyzing" class="analyzing-indicator">
+          <span class="analyzing-spinner"></span>
+          Analisando documento...
         </div>
 
         <button class="convert-btn" @click="handleConvert">
@@ -878,6 +969,108 @@ function clearFile() {
   align-items: center;
   gap: 0.5rem;
   color: var(--text-primary);
+}
+
+/* Page Range Selector */
+.page-selector {
+  background: var(--bg-hover);
+  padding: 1.25rem;
+  border-radius: var(--radius-md);
+}
+
+.page-mode-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn:hover {
+  border-color: var(--accent);
+}
+
+.mode-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.range-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.range-field label {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.page-input {
+  width: 70px;
+  padding: 0.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.page-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(16, 149, 194, 0.2);
+}
+
+.range-separator {
+  color: var(--accent);
+  font-size: 1.2rem;
+}
+
+.range-info {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+.analyzing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--gs-cyan);
+  font-size: 0.9rem;
+  padding: 1rem;
+  background: rgba(16, 149, 194, 0.1);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(16, 149, 194, 0.3);
+}
+
+.analyzing-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid transparent;
+  border-top-color: var(--gs-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 /* Convert Button */
