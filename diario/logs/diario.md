@@ -75,6 +75,50 @@
 
 ---
 
+## 20/12/2024 - Otimização de PDF (Compressão) 📉
+
+### Conquistas
+
+**Nova Funcionalidade: Otimização de PDF**
+
+- Implementada nova aba "Otimizar PDF" no app.
+- Suporte a 4 níveis de compressão (Tela, Ebook, Impressão, Gráfica).
+- Feedback visual de progresso e redução de tamanho.
+- Download automático com extensão `.pdf` forçada.
+
+**Refatoração de UI**
+
+- Componente `FileUploader` reutilizável com suporte a Drag & Drop.
+- Componente `ProcessingStatus` reutilizável para feedback de progresso.
+- Componente `AppHeader` para cabeçalho unificado.
+- Variáveis CSS globais em `App.vue` para consistência de tema.
+
+**Ghostscript Worker**
+
+- Atualizado para suportar dispositivo `pdfwrite`.
+- Nova função `optimizePdf` no serviço.
+- Suporte a parâmetros de otimização (`-dPDFSETTINGS`, `-dCompatibilityLevel`).
+
+**Analytics**
+
+- Novos eventos: `optimization_started`, `optimization_completed`.
+- Rastreamento de redução percentual e tempo de processamento.
+
+### Desafios Resolvidos
+
+1.  **Conflito de IDs no Upload** - O componente de upload duplicado nas abas causava conflito de labels. Resolvido com prop `id` dinâmica.
+2.  **Download sem extensão** - O Blob gerado às vezes não era salvo como PDF. Forçada a extensão `.pdf` no nome do arquivo.
+3.  **Estilos Quebrados** - Variáveis CSS estavam isoladas no componente antigo. Movidas para escopo global.
+
+### Commits do Dia
+
+- `feat: implementa otimização de PDF com presets`
+- `refactor: extrai componentes FileUploader e AppHeader`
+- `fix: corrige conflito de IDs no upload e extensão de download`
+- `style: move variáveis CSS para escopo global`
+
+---
+
 ## Template para Próximas Entradas
 
 ```markdown

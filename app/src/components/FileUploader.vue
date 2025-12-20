@@ -8,6 +8,7 @@ const props = defineProps<{
   accept?: string;
   title?: string;
   description?: string;
+  id?: string;
 }>();
 
 const emit = defineEmits<{
@@ -70,7 +71,7 @@ function handleFileSelect(event: Event) {
   >
     <input 
       type="file" 
-      id="file-input"
+      :id="id || 'file-input'"
       :accept="accept || '.pdf'" 
       @change="handleFileSelect"
       :disabled="isLoading || isProcessing"
@@ -85,7 +86,7 @@ function handleFileSelect(event: Event) {
       </div>
       <h2 class="upload-title">{{ title || 'Arraste seu PDF aqui' }}</h2>
       <p class="upload-desc">{{ description || 'ou clique para selecionar um arquivo' }}</p>
-      <label for="file-input" class="upload-btn">
+      <label :for="id || 'file-input'" class="upload-btn">
         <span class="btn-glow"></span>
         <span class="btn-text">Escolher Arquivo</span>
       </label>

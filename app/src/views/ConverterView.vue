@@ -11,6 +11,7 @@ import {
 import { AppEvents } from '@/services/firebase';
 import FileUploader from '@/components/FileUploader.vue';
 import ProcessingStatus from '@/components/ProcessingStatus.vue';
+import AppHeader from '@/components/AppHeader.vue';
 
 // Estado
 const isLoading = ref(false);
@@ -249,27 +250,16 @@ function clearFile() {
     </div>
 
     <!-- Header -->
-    <header class="header">
-      <div class="logo-wrapper">
-        <img src="/ghostscript/Ghostscript.svg" alt="Ghostscript" class="logo" />
-        <div class="badge-container">
-          <span class="badge">WebAssembly</span>
-          <span class="badge badge-secondary">16MB</span>
-        </div>
-      </div>
-      <p class="tagline">
-        <span class="highlight">PDF → Imagens</span> direto no navegador
-      </p>
-      <div class="features">
-        <span class="feature">🔒 100% Privado</span>
-        <span class="feature">🚀 Sem Limites</span>
-        <span class="feature">📡 Funciona Offline</span>
-      </div>
-    </header>
+    <AppHeader
+      title-prefix="PDF → Imagens"
+      title-suffix="direto no navegador"
+      :features="['🔒 100% Privado', '🚀 Sem Limites', '📡 Funciona Offline']"
+    />
 
     <main class="main">
       <!-- Upload Card -->
       <FileUploader
+        id="converter-upload"
         :selected-file="selectedFile"
         :is-loading="isLoading"
         :is-processing="isConverting"
@@ -508,56 +498,9 @@ function clearFile() {
    DESIGN SYSTEM - Ghostscript Premium UI
    ======================================== */
 
-/* Theme Variables */
-.app {
-  /* Cores Ghostscript */
-  --gs-cyan: #1095C2;
-  --gs-cyan-light: #3BB4DE;
-  --gs-cyan-dark: #0A7A9D;
-  
-  /* Base Colors */
-  --bg-base: #0a0a0f;
-  --bg-elevated: #12121a;
-  --bg-card: #1a1a24;
-  --bg-hover: #222230;
-  
-  /* Text */
-  --text-primary: #ffffff;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
-  
-  /* Accents */
-  --accent: var(--gs-cyan);
-  --accent-light: var(--gs-cyan-light);
-  --gradient: linear-gradient(135deg, var(--gs-cyan) 0%, #6366f1 50%, #8b5cf6 100%);
-  --gradient-subtle: linear-gradient(135deg, rgba(16, 149, 194, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-  
-  /* Effects */
-  --glow-cyan: 0 0 40px rgba(16, 149, 194, 0.4);
-  --glow-purple: 0 0 40px rgba(139, 92, 246, 0.3);
-  
-  /* Feedback */
-  --success: #10b981;
-  --error: #ef4444;
-  --warning: #f59e0b;
-  
-  /* Borders */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(16, 149, 194, 0.5);
-  
-  /* Sizing */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-}
-
 /* Base Layout */
 .app {
   min-height: 100vh;
-  background: var(--bg-base);
-  color: var(--text-primary);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   position: relative;
   overflow-x: hidden;
 }
@@ -614,84 +557,7 @@ function clearFile() {
   66% { transform: translate(-20px, 20px) scale(0.95); }
 }
 
-/* Header */
-.header {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  padding: 4rem 2rem 3rem;
-}
 
-.logo-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.logo {
-  height: 70px;
-  width: auto;
-  filter: brightness(0) invert(1) drop-shadow(0 0 30px rgba(16, 149, 194, 0.5));
-  transition: all 0.4s ease;
-}
-
-.logo:hover {
-  transform: scale(1.05);
-  filter: brightness(0) invert(1) drop-shadow(0 0 50px rgba(16, 149, 194, 0.8));
-}
-
-.badge-container {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.badge {
-  background: var(--gradient);
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.4rem 1rem;
-  border-radius: 20px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.badge-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-}
-
-.tagline {
-  font-size: 1.5rem;
-  color: var(--text-secondary);
-  margin-bottom: 1.5rem;
-}
-
-.highlight {
-  color: var(--gs-cyan-light);
-  font-weight: 600;
-}
-
-.features {
-  display: flex;
-  justify-content: center;
-  gap: 2rem;
-  flex-wrap: wrap;
-}
-
-.feature {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  padding: 0.5rem 1rem;
-  background: var(--gradient-subtle);
-  border-radius: 20px;
-  border: 1px solid var(--border);
-}
 
 /* Main Content */
 .main {

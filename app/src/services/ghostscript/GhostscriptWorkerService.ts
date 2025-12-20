@@ -26,6 +26,10 @@ export interface AnalyzeResult {
   pageCount: number;
 }
 
+export interface OptimizeResult {
+  pdfData: Uint8Array;
+}
+
 // Worker instance
 let worker: Worker | null = null;
 let isInitialized = false;
@@ -39,6 +43,8 @@ let analyzeReject: ((error: Error) => void) | null = null;
 let analyzeProgressCallback: ((current: number, total: number) => void) | null = null;
 let convertResolve: ((result: ConvertResult) => void) | null = null;
 let convertReject: ((error: Error) => void) | null = null;
+let optimizeResolve: ((result: OptimizeResult) => void) | null = null;
+let optimizeReject: ((error: Error) => void) | null = null;
 let progressCallback: ((current: number, total: number) => void) | null = null;
 
 /**
@@ -93,6 +99,14 @@ function handleWorkerMessage(event: MessageEvent) {
       }
       break;
       
+    case 'optimized':
+      console.log('[GS Service] Otimização concluída!');
+      if (optimizeResolve && payload?.pdfData) {
+        optimizeResolve({ pdfData: payload.pdfData });
+        optimizeResolve = null;
+      }
+      break;
+      
     case 'error':
       console.error('[GS Service] Erro:', payload?.error);
       const error = new Error(payload?.error || 'Erro desconhecido');
@@ -109,6 +123,10 @@ function handleWorkerMessage(event: MessageEvent) {
         convertReject(error);
         convertReject = null;
         progressCallback = null;
+      }
+      if (optimizeReject) {
+        optimizeReject(error);
+        optimizeReject = null;
       }
       break;
   }
@@ -215,6 +233,35 @@ export async function convertPdfWithWorker(
         grayscale: options.grayscale ?? false,
         firstPage: options.firstPage,
         lastPage: options.lastPage,
+      },
+    });
+  });
+}
+
+/**
+ * Otimiza PDF usando o Worker
+ */
+export async function optimizePdf(
+  pdfData: Uint8Array,
+  settings: string = '/ebook'
+): Promise<OptimizeResult> {
+  if (!isInitialized) {
+    await initGhostscriptWorker();
+  }
+  
+  if (!worker) {
+    throw new Error('Worker não disponível');
+  }
+  
+  return new Promise((resolve, reject) => {
+    optimizeResolve = resolve;
+    optimizeReject = reject;
+    
+    worker!.postMessage({
+      type: 'optimize',
+      payload: {
+        pdfData,
+        settings,
       },
     });
   });

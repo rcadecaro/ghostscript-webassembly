@@ -132,6 +132,23 @@ export const AppEvents = {
     });
   },
 
+  // Otimização
+  optimizationStarted: (preset: string, originalSize: number) => {
+    trackEvent('optimization_started', {
+      preset,
+      original_size_kb: Math.round(originalSize / 1024),
+    });
+  },
+
+  optimizationCompleted: (preset: string, newSize: number, durationMs: number, reductionPercent: number) => {
+    trackEvent('optimization_completed', {
+      preset,
+      new_size_kb: Math.round(newSize / 1024),
+      duration_seconds: Math.round(durationMs / 1000),
+      reduction_percent: reductionPercent,
+    });
+  },
+
   // Erro
   errorOccurred: (errorType: string, errorMessage: string) => {
     trackEvent('error_occurred', {

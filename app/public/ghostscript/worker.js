@@ -250,6 +250,60 @@ async function convertPdf(pdfData, dpi, grayscale, firstPage, lastPage) {
   }
 }
 
+// Otimizar PDF usando pdfwrite
+async function optimizePdf(pdfData, settings) {
+  if (!gsModule) {
+    self.postMessage({ type: 'error', payload: { error: 'Módulo não inicializado' } });
+    return;
+  }
+
+  try {
+    // Criar diretórios
+    try { gsModule.FS.mkdir('/tmp'); } catch (e) { /* já existe */ }
+
+    // Escrever PDF de entrada
+    gsModule.FS.writeFile('/tmp/input.pdf', pdfData);
+
+    // Argumentos base
+    const args = [
+      '-sDEVICE=pdfwrite',
+      '-dCompatibilityLevel=1.4',
+      `-dPDFSETTINGS=${settings || '/ebook'}`,
+      '-dNOPAUSE',
+      '-dQUIET', // Manter QUIET por padrão, mas poderia ser configurável
+      '-dBATCH',
+      '-sOutputFile=/tmp/output.pdf',
+      '/tmp/input.pdf'
+    ];
+
+    // Executar
+    const exitCode = gsModule.callMain(args);
+
+    if (exitCode !== 0) {
+      throw new Error(`Ghostscript retornou código ${exitCode}`);
+    }
+
+    // Ler resultado
+    const optimizedData = gsModule.FS.readFile('/tmp/output.pdf');
+    
+    // Limpar
+    try { gsModule.FS.unlink('/tmp/input.pdf'); } catch (e) { /* ignore */ }
+    try { gsModule.FS.unlink('/tmp/output.pdf'); } catch (e) { /* ignore */ }
+
+    // Enviar sucesso
+    self.postMessage({
+      type: 'optimized',
+      payload: { pdfData: new Uint8Array(optimizedData) }
+    });
+
+  } catch (error) {
+    self.postMessage({
+      type: 'error',
+      payload: { error: error.message || 'Erro na otimização' }
+    });
+  }
+}
+
 // Handler de mensagens
 self.onmessage = async (event) => {
   const { type, payload } = event.data;
@@ -274,6 +328,12 @@ self.onmessage = async (event) => {
           payload.firstPage,
           payload.lastPage
         );
+      }
+      break;
+
+    case 'optimize':
+      if (payload?.pdfData) {
+        await optimizePdf(payload.pdfData, payload.settings);
       }
       break;
   }
