@@ -32,21 +32,21 @@ O **Firebase CLI** (`firebase-tools`) **não possui** comandos para criar dimens
 
 Crie uma dimensão para cada linha abaixo. Mantenha o "Escopo" como **Evento**.
 
-| Nome da Dimensão (Exibição) | Parâmetro do Evento (Código) | Descrição                                 |
-| --------------------------- | ---------------------------- | ----------------------------------------- |
-| **File Name**               | `file_name`                  | Nome do arquivo PDF                       |
-| **File Size (KB)**          | `file_size_kb`               | Tamanho do arquivo                        |
-| **Page Count**              | `page_count`                 | Total de páginas do PDF                   |
-| **DPI**                     | `dpi`                        | Resolução escolhida                       |
-| **Grayscale**               | `grayscale`                  | Se foi conversão P&B (true/false)         |
-| **Page Range**              | `page_range`                 | Intervalo de páginas (ex: "1-5" ou "all") |
-| **Duration (Seconds)**      | `duration_seconds`           | Tempo de conversão                        |
-| **Image Count**             | `image_count`                | Quantidade de imagens geradas/baixadas    |
-| **Page Number**             | `page_number`                | Número da página visualizada/baixada      |
-| **Direction**               | `direction`                  | Direção da navegação (next/prev)          |
-| **Error Type**              | `error_type`                 | Tipo de erro                              |
-| **Error Message**           | `error_message`              | Mensagem de erro                          |
-| **Debug Mode**              | `debug_mode`                 | Se é modo debug (true)                    |
+| Nome da Dimensão (Exibição) | Parâmetro do Evento (Código) | Descrição                                             |
+| --------------------------- | ---------------------------- | ----------------------------------------------------- |
+| **File Name**               | `file_name`                  | Nome do arquivo PDF                                   |
+| **File Size (KB)**          | `file_size_kb`               | Tamanho do arquivo                                    |
+| **Page Count**              | `page_count`                 | Total de páginas do PDF                               |
+| **DPI**                     | `dpi`                        | Resolução escolhida                                   |
+| **Grayscale**               | `grayscale`                  | Se foi conversão P&B (true/false)                     |
+| **Page Range**              | `page_range`                 | Intervalo de páginas (ex: "1-5" ou "all")             |
+| **Duration (Seconds)**      | `duration_seconds`           | Tempo de conversão                                    |
+| **Image Count**             | `image_count`                | Imagens no ZIP (`zip_downloaded`) ou total convertido |
+| **Page Number**             | `page_number`                | Número da página visualizada/baixada                  |
+| **Direction**               | `direction`                  | Direção da navegação (next/prev)                      |
+| **Error Type**              | `error_type`                 | Tipo de erro                                          |
+| **Error Message**           | `error_message`              | Mensagem de erro                                      |
+| **Debug Mode**              | `debug_mode`                 | Se é modo debug (true)                                |
 
 ---
 
