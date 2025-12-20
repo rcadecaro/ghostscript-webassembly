@@ -42,6 +42,9 @@ function openPreview(img: string, index: number) {
   previewIndex.value = index;
   showPreview.value = true;
   document.body.style.overflow = 'hidden';
+  
+  // Rastrear abertura
+  AppEvents.previewOpened(index + 1);
 }
 
 function closePreview() {
@@ -55,6 +58,9 @@ function navigatePreview(direction: number) {
   if (newIndex >= 0 && newIndex < resultImages.value.length) {
     previewIndex.value = newIndex;
     previewImage.value = resultImages.value[newIndex] || null;
+    
+    // Rastrear navegação
+    AppEvents.previewNavigated(newIndex + 1, direction > 0 ? 'next' : 'prev');
   }
 }
 

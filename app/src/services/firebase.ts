@@ -118,6 +118,20 @@ export const AppEvents = {
     });
   },
 
+  // Preview
+  previewOpened: (pageNumber: number) => {
+    trackEvent('preview_opened', {
+      page_number: pageNumber,
+    });
+  },
+
+  previewNavigated: (pageNumber: number, direction: 'next' | 'prev') => {
+    trackEvent('preview_navigated', {
+      page_number: pageNumber,
+      direction: direction,
+    });
+  },
+
   // Erro
   errorOccurred: (errorType: string, errorMessage: string) => {
     trackEvent('error_occurred', {
