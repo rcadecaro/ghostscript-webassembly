@@ -8,11 +8,27 @@ Os **eventos** (nomes como `preview_opened`) aparecem automaticamente, mas os de
 
 ## 🛠️ Como Registrar Dimensões Personalizadas
 
+### Opção 1: Via Painel (Recomendado)
+
 1. Acesse o [Console do Firebase](https://console.firebase.google.com/).
 2. Vá em **Analytics** > **Custom Definitions** (Definições Personalizadas).
 3. Clique no botão **Create custom dimensions** (Criar dimensões personalizadas).
 
-### Lista de Dimensões para Criar
+### Opção 2: Via Linha de Comando (Não Suportado Nativamente)
+
+O **Firebase CLI** (`firebase-tools`) **não possui** comandos para criar dimensões personalizadas.
+
+É possível automatizar via **Google Analytics Admin API**, mas requer:
+
+1. Ativar a API no Google Cloud Console.
+2. Criar uma Service Account.
+3. Escrever um script (Node.js/Python) para fazer as chamadas.
+
+> **Nota:** Para a quantidade atual de dimensões (~12), o método manual via painel é muito mais rápido do que configurar o ambiente de automação.
+
+---
+
+## Lista de Dimensões para Criar
 
 Crie uma dimensão para cada linha abaixo. Mantenha o "Escopo" como **Evento**.
 
@@ -30,6 +46,7 @@ Crie uma dimensão para cada linha abaixo. Mantenha o "Escopo" como **Evento**.
 | **Direction**               | `direction`                  | Direção da navegação (next/prev)          |
 | **Error Type**              | `error_type`                 | Tipo de erro                              |
 | **Error Message**           | `error_message`              | Mensagem de erro                          |
+| **Debug Mode**              | `debug_mode`                 | Se é modo debug (true)                    |
 
 ---
 
