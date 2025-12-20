@@ -9,6 +9,8 @@ import {
   isWorkerReady 
 } from '@/services/ghostscript/GhostscriptWorkerService';
 import { AppEvents } from '@/services/firebase';
+import FileUploader from '@/components/FileUploader.vue';
+import ProcessingStatus from '@/components/ProcessingStatus.vue';
 
 // Estado
 const isLoading = ref(false);
@@ -17,7 +19,6 @@ const progress = ref({ current: 0, total: 0 });
 const error = ref<string | null>(null);
 const selectedFile = ref<File | null>(null);
 const resultImages = ref<string[]>([]);
-const isDragging = ref(false);
 
 // Opções de conversão
 const dpi = ref<72 | 150 | 300 | 600>(150);
@@ -81,39 +82,9 @@ const statusText = computed(() => {
   return '';
 });
 
-const fileSizeFormatted = computed(() => {
-  if (!selectedFile.value) return '';
-  const size = selectedFile.value.size;
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-});
+
 
 // Handlers
-function handleDragOver(event: DragEvent) {
-  event.preventDefault();
-  isDragging.value = true;
-}
-
-function handleDragLeave() {
-  isDragging.value = false;
-}
-
-function handleDrop(event: DragEvent) {
-  event.preventDefault();
-  isDragging.value = false;
-  const files = event.dataTransfer?.files;
-  if (files && files[0] && files[0].type === 'application/pdf') {
-    loadAndAnalyzeFile(files[0]);
-  }
-}
-
-async function handleFileSelect(event: Event) {
-  const input = event.target as HTMLInputElement;
-  if (input.files && input.files[0]) {
-    await loadAndAnalyzeFile(input.files[0]);
-  }
-}
 
 async function loadAndAnalyzeFile(file: File) {
   selectedFile.value = file;
@@ -298,56 +269,14 @@ function clearFile() {
 
     <main class="main">
       <!-- Upload Card -->
-      <section 
-        class="upload-card" 
-        :class="{ dragging: isDragging, 'has-file': selectedFile }"
-        @dragover="handleDragOver"
-        @dragleave="handleDragLeave"
-        @drop="handleDrop"
-      >
-        <input 
-          type="file" 
-          id="file-input"
-          accept=".pdf" 
-          @change="handleFileSelect"
-          :disabled="isLoading || isConverting"
-          class="file-input"
-        />
-        
-        <div v-if="!selectedFile" class="upload-content">
-          <div class="upload-icon-wrapper">
-            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7 10V9C7 6.23858 9.23858 4 12 4C14.7614 4 17 6.23858 17 9V10C19.2091 10 21 11.7909 21 14C21 15.4806 20.1956 16.8084 19 17.5M7 10C4.79086 10 3 11.7909 3 14C3 15.4806 3.8044 16.8084 5 17.5M7 10C7.43285 10 7.84965 10.0688 8.24006 10.1959M12 12V21M12 12L15 15M12 12L9 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <h2 class="upload-title">Arraste seu PDF aqui</h2>
-          <p class="upload-desc">ou clique para selecionar um arquivo</p>
-          <label for="file-input" class="upload-btn">
-            <span class="btn-glow"></span>
-            <span class="btn-text">Escolher Arquivo</span>
-          </label>
-          <p class="upload-hint">Suporta PDFs de qualquer tamanho</p>
-        </div>
-
-        <div v-else class="file-preview">
-          <div class="file-icon-wrapper">
-            <svg class="file-icon" viewBox="0 0 24 24" fill="none">
-              <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M14 2V8H20" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M9 13H15M9 17H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <div class="file-info">
-            <h3 class="file-name">{{ selectedFile.name }}</h3>
-            <span class="file-meta">{{ fileSizeFormatted }} • PDF</span>
-          </div>
-          <button class="remove-btn" @click.stop="clearFile" title="Remover">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </div>
-      </section>
+      <FileUploader
+        :selected-file="selectedFile"
+        :is-loading="isLoading"
+        :is-processing="isConverting"
+        accept=".pdf"
+        @file-selected="loadAndAnalyzeFile"
+        @clear-file="clearFile"
+      />
 
       <!-- Settings Panel -->
       <section v-if="selectedFile && !isConverting && !isLoading" class="settings-panel">
@@ -452,36 +381,13 @@ function clearFile() {
       </section>
 
       <!-- Progress -->
-      <section v-if="isLoading || isConverting" class="progress-panel">
-        <div class="spinner-container">
-          <div class="spinner">
-            <div class="spinner-ring"></div>
-            <div class="spinner-ring"></div>
-            <div class="spinner-ring"></div>
-          </div>
-        </div>
-        <div class="progress-info">
-          <h3 class="progress-title" v-if="isLoading">Carregando Ghostscript</h3>
-          <h3 class="progress-title" v-else>Processando PDF</h3>
-          <p class="progress-status">{{ statusText }}</p>
-          
-          <!-- Barra de progresso real-time -->
-          <div v-if="isConverting && progress.total > 0" class="progress-bar-section">
-            <div class="progress-bar-container">
-              <div class="progress-bar" :style="{ width: `${progressPercent}%` }"></div>
-            </div>
-            <span class="progress-percent">{{ progressPercent }}%</span>
-          </div>
-          
-          <p class="progress-hint" v-if="isConverting && progress.total === 0">
-            ⏳ Analisando documento...
-          </p>
-          <p class="progress-hint" v-if="isLoading">
-            📦 Baixando módulo WebAssembly (~16MB)...<br/>
-            Isso só acontece na primeira vez.
-          </p>
-        </div>
-      </section>
+      <ProcessingStatus
+        :is-loading="isLoading"
+        :is-processing="isConverting"
+        :progress="progress"
+        :status-text="statusText"
+        :progress-percent="progressPercent"
+      />
 
       <!-- Error -->
       <section v-if="error" class="error-panel">
