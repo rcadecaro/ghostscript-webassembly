@@ -5,7 +5,7 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { getAnalytics, logEvent, isSupported } from 'firebase/analytics';
+import { getAnalytics, logEvent, isSupported, setAnalyticsCollectionEnabled } from 'firebase/analytics';
 import type { Analytics } from 'firebase/analytics';
 
 const firebaseConfig = {
@@ -31,7 +31,19 @@ analyticsReady = (async () => {
     const supported = await isSupported();
     if (supported) {
       analytics = getAnalytics(app);
+      // Forçar habilitação da coleta
+      setAnalyticsCollectionEnabled(analytics, true);
+      
       console.log('[Analytics] ✓ Firebase Analytics inicializado');
+      console.log('[Analytics] Config:', firebaseConfig);
+      
+      // Expor para debug manual no console
+      (window as any).debugAnalytics = {
+        app,
+        analytics,
+        trackEvent
+      };
+      
       return analytics;
     } else {
       console.log('[Analytics] ✗ Analytics não suportado neste ambiente');
