@@ -32,6 +32,32 @@ const firstPage = ref(1);
 const lastPage = ref(1);
 const pdfDataCache = ref<Uint8Array | null>(null);
 
+// Modal de preview
+const showPreview = ref(false);
+const previewImage = ref<string | null>(null);
+const previewIndex = ref(0);
+
+function openPreview(img: string, index: number) {
+  previewImage.value = img;
+  previewIndex.value = index;
+  showPreview.value = true;
+  document.body.style.overflow = 'hidden';
+}
+
+function closePreview() {
+  showPreview.value = false;
+  previewImage.value = null;
+  document.body.style.overflow = '';
+}
+
+function navigatePreview(direction: number) {
+  const newIndex = previewIndex.value + direction;
+  if (newIndex >= 0 && newIndex < resultImages.value.length) {
+    previewIndex.value = newIndex;
+    previewImage.value = resultImages.value[newIndex] || null;
+  }
+}
+
 // Computed
 const progressPercent = computed(() => {
   if (progress.value.total === 0) return 0;
@@ -485,12 +511,19 @@ function clearFile() {
             :key="index" 
             class="result-card"
           >
-            <div class="card-image">
+            <div class="card-image" @click="openPreview(img, index)" title="Clique para ampliar">
               <img :src="img" :alt="`Página ${index + 1}`" loading="lazy" />
+              <div class="zoom-overlay">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+                  <path d="M21 21L16.5 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M11 8V14M8 11H14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
             </div>
             <div class="card-footer">
               <span class="page-badge">Página {{ index + 1 }}</span>
-              <button @click="handleDownloadSingle(img, index)" class="card-download" title="Baixar página">
+              <button @click.stop="handleDownloadSingle(img, index)" class="card-download" title="Baixar página">
                 <svg viewBox="0 0 24 24" fill="none">
                   <path d="M12 3V16M12 16L7 11M12 16L17 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -500,6 +533,53 @@ function clearFile() {
         </div>
       </section>
     </main>
+
+    <!-- Modal de Preview -->
+    <teleport to="body">
+      <div v-if="showPreview" class="preview-modal" @click="closePreview">
+        <div class="preview-content" @click.stop>
+          <button class="preview-close" @click="closePreview" title="Fechar">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          
+          <button 
+            v-if="previewIndex > 0" 
+            class="preview-nav prev" 
+            @click="navigatePreview(-1)"
+            title="Anterior"
+          >
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          
+          <img v-if="previewImage" :src="previewImage" :alt="`Página ${previewIndex + 1}`" class="preview-image" />
+          
+          <button 
+            v-if="previewIndex < resultImages.length - 1" 
+            class="preview-nav next" 
+            @click="navigatePreview(1)"
+            title="Próxima"
+          >
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          
+          <div class="preview-info">
+            <span>Página {{ previewIndex + 1 }} de {{ resultImages.length }}</span>
+            <button @click="handleDownloadSingle(previewImage!, previewIndex)" class="preview-download">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 3V16M12 16L7 11M12 16L17 11M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Baixar
+            </button>
+          </div>
+        </div>
+      </div>
+    </teleport>
 
     <!-- Footer -->
     <footer class="footer">
@@ -1552,6 +1632,193 @@ function clearFile() {
   .results-header {
     flex-direction: column;
     text-align: center;
+  }
+}
+
+/* Modal de Preview */
+.preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(10px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.preview-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 4rem 2rem;
+}
+
+.preview-image {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: scaleIn 0.3s ease;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.preview-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preview-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.preview-close svg {
+  width: 24px;
+  height: 24px;
+}
+
+.preview-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preview-nav:hover {
+  background: var(--gs-cyan);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.preview-nav.prev {
+  left: 1rem;
+}
+
+.preview-nav.next {
+  right: 1rem;
+}
+
+.preview-nav svg {
+  width: 28px;
+  height: 28px;
+}
+
+.preview-info {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 0.75rem 1.5rem;
+  border-radius: 100px;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.preview-download {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--gs-cyan);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 100px;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preview-download:hover {
+  background: var(--gs-cyan-light);
+  transform: scale(1.05);
+}
+
+.preview-download svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Zoom overlay nas miniaturas */
+.card-image {
+  cursor: zoom-in;
+}
+
+.zoom-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.card-image:hover .zoom-overlay {
+  opacity: 1;
+}
+
+.zoom-overlay svg {
+  width: 40px;
+  height: 40px;
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .preview-nav {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .preview-nav svg {
+    width: 22px;
+    height: 22px;
+  }
+  
+  .preview-info {
+    flex-direction: column;
+    gap: 0.75rem;
   }
 }
 </style>
