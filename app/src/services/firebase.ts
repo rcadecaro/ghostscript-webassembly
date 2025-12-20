@@ -51,8 +51,11 @@ export async function trackEvent(eventName: string, params?: Record<string, unkn
   const analyticsInstance = await analyticsReady;
   
   if (analyticsInstance) {
-    logEvent(analyticsInstance, eventName, params);
-    console.log(`[Analytics] Evento: ${eventName}`, params);
+    // Adiciona debug_mode: true para garantir que apareça no DebugView do GA4
+    // Isso é útil especialmente em localhost
+    const finalParams = { ...params, debug_mode: true };
+    logEvent(analyticsInstance, eventName, finalParams);
+    console.log(`[Analytics] Evento: ${eventName}`, finalParams);
   } else {
     console.warn(`[Analytics] Evento ignorado (não inicializado): ${eventName}`);
   }
