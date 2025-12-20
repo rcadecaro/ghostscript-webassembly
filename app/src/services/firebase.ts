@@ -21,30 +21,40 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Analytics instance (inicializado async para suportar SSR)
+// Analytics instance
 let analytics: Analytics | null = null;
+let analyticsReady: Promise<Analytics | null>;
 
 // Inicializar Analytics (só funciona no browser)
-async function initAnalytics() {
-  if (analytics) return analytics;
-  
-  const supported = await isSupported();
-  if (supported) {
-    analytics = getAnalytics(app);
-    console.log('[Analytics] Firebase Analytics inicializado');
+analyticsReady = (async () => {
+  try {
+    const supported = await isSupported();
+    if (supported) {
+      analytics = getAnalytics(app);
+      console.log('[Analytics] ✓ Firebase Analytics inicializado');
+      return analytics;
+    } else {
+      console.log('[Analytics] ✗ Analytics não suportado neste ambiente');
+      return null;
+    }
+  } catch (error) {
+    console.error('[Analytics] Erro ao inicializar:', error);
+    return null;
   }
-  return analytics;
-}
-
-// Inicializar ao carregar o módulo
-initAnalytics();
+})();
 
 /**
  * Rastrear evento customizado
  */
-export function trackEvent(eventName: string, params?: Record<string, unknown>) {
-  if (analytics) {
-    logEvent(analytics, eventName, params);
+export async function trackEvent(eventName: string, params?: Record<string, unknown>) {
+  // Aguardar Analytics estar pronto
+  const analyticsInstance = await analyticsReady;
+  
+  if (analyticsInstance) {
+    logEvent(analyticsInstance, eventName, params);
+    console.log(`[Analytics] Evento: ${eventName}`, params);
+  } else {
+    console.warn(`[Analytics] Evento ignorado (não inicializado): ${eventName}`);
   }
 }
 
@@ -97,9 +107,9 @@ export const AppEvents = {
   errorOccurred: (errorType: string, errorMessage: string) => {
     trackEvent('error_occurred', {
       error_type: errorType,
-      error_message: errorMessage.substring(0, 100), // limitar tamanho
+      error_message: errorMessage.substring(0, 100),
     });
   },
 };
 
-export { app, analytics };
+export { app, analytics, analyticsReady };
