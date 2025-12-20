@@ -1781,7 +1781,9 @@ function clearFile() {
 
 /* Zoom overlay nas miniaturas */
 .card-image {
+  position: relative;
   cursor: zoom-in;
+  overflow: hidden;
 }
 
 .zoom-overlay {
