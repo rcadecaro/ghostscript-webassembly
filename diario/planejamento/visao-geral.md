@@ -23,6 +23,7 @@
 - [x] **Drag & Drop** para upload
 - [x] **Download individual** de imagens
 - [x] **Download ZIP** de todas imagens
+- [x] **Modal de visualização** com navegação entre páginas ✨ NOVO
 
 ### Infraestrutura
 
@@ -30,6 +31,7 @@
 - [x] **GitHub Actions** CI/CD
 - [x] **Google Analytics** para monitoramento
 - [x] **Headers COOP/COEP** para WASM
+- [x] **SEO** - Título, favicon e meta description
 
 ---
 
@@ -40,6 +42,7 @@
 | Frontend   | Vue 3 + TypeScript |
 | Build      | Vite               |
 | PDF Engine | Ghostscript WASM   |
+| ZIP        | JSZip              |
 | Hosting    | Firebase Hosting   |
 | Analytics  | Google Analytics 4 |
 | CI/CD      | GitHub Actions     |
@@ -82,6 +85,16 @@
 
 ---
 
+## Documentação Disponível
+
+| Documento                  | Descrição                                    |
+| -------------------------- | -------------------------------------------- |
+| `estudos/web-workers.md`   | Guia completo de Web Workers para estudantes |
+| `dificuldades/registro.md` | Problemas resolvidos com soluções detalhadas |
+| `logs/diario.md`           | Log diário de desenvolvimento                |
+
+---
+
 ## Próximos Passos (Backlog)
 
 - [ ] Compressão de PDF
@@ -89,3 +102,4 @@
 - [ ] Split de PDFs
 - [ ] Conversão para outros formatos
 - [ ] PWA / Offline support
+- [ ] Suporte a teclado no modal (← → Esc)
