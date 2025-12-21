@@ -45,6 +45,7 @@ let convertResolve: ((result: ConvertResult) => void) | null = null;
 let convertReject: ((error: Error) => void) | null = null;
 let optimizeResolve: ((result: OptimizeResult) => void) | null = null;
 let optimizeReject: ((error: Error) => void) | null = null;
+let optimizeProgressCallback: ((current: number, total: number) => void) | null = null;
 let progressCallback: ((current: number, total: number) => void) | null = null;
 
 /**
@@ -99,11 +100,20 @@ function handleWorkerMessage(event: MessageEvent) {
       }
       break;
       
+      break;
+      
+    case 'optimize_progress':
+      if (optimizeProgressCallback && payload) {
+        optimizeProgressCallback(payload.current || 0, payload.total || 0);
+      }
+      break;
+
     case 'optimized':
       console.log('[GS Service] Otimização concluída!');
       if (optimizeResolve && payload?.pdfData) {
         optimizeResolve({ pdfData: payload.pdfData });
         optimizeResolve = null;
+        optimizeProgressCallback = null;
       }
       break;
       
@@ -127,6 +137,7 @@ function handleWorkerMessage(event: MessageEvent) {
       if (optimizeReject) {
         optimizeReject(error);
         optimizeReject = null;
+        optimizeProgressCallback = null;
       }
       break;
   }
@@ -243,7 +254,8 @@ export async function convertPdfWithWorker(
  */
 export async function optimizePdf(
   pdfData: Uint8Array,
-  settings: string = '/ebook'
+  settings: string = '/ebook',
+  onProgress?: (current: number, total: number) => void
 ): Promise<OptimizeResult> {
   if (!isInitialized) {
     await initGhostscriptWorker();
@@ -256,6 +268,7 @@ export async function optimizePdf(
   return new Promise((resolve, reject) => {
     optimizeResolve = resolve;
     optimizeReject = reject;
+    optimizeProgressCallback = onProgress || null;
     
     worker!.postMessage({
       type: 'optimize',

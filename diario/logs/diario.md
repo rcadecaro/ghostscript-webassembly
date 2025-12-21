@@ -116,6 +116,7 @@
 - `refactor: extrai componentes FileUploader e AppHeader`
 - `fix: corrige conflito de IDs no upload e extensão de download`
 - `style: move variáveis CSS para escopo global`
+- `feat: adiciona rastreamento de progresso detalhado na otimização`
 
 ---
 

@@ -12,6 +12,7 @@
 let gsModule = null;
 let detectedTotalPages = 0;
 let isAnalyzing = false;
+let isOptimizing = false;
 let analyzedPageCount = 0;
 
 // Guardar console.log original
@@ -50,6 +51,12 @@ function handleGsOutput(text) {
       // Enviar progresso durante análise
       self.postMessage({ 
         type: 'analyze_progress', 
+        payload: { current: currentPage, total: detectedTotalPages }
+      });
+    } else if (isOptimizing) {
+      // Enviar progresso durante otimização
+      self.postMessage({ 
+        type: 'optimize_progress', 
         payload: { current: currentPage, total: detectedTotalPages }
       });
     } else {
@@ -263,6 +270,9 @@ async function optimizePdf(pdfData, settings) {
 
     // Escrever PDF de entrada
     gsModule.FS.writeFile('/tmp/input.pdf', pdfData);
+    
+    isOptimizing = true;
+    detectedTotalPages = 0; // Resetar contagem
 
     // Argumentos base
     const args = [
@@ -270,7 +280,9 @@ async function optimizePdf(pdfData, settings) {
       '-dCompatibilityLevel=1.4',
       `-dPDFSETTINGS=${settings || '/ebook'}`,
       '-dNOPAUSE',
-      '-dQUIET', // Manter QUIET por padrão, mas poderia ser configurável
+      `-dPDFSETTINGS=${settings || '/ebook'}`,
+      '-dNOPAUSE',
+      // '-dQUIET', // Removido para permitir logs de progresso
       '-dBATCH',
       '-sOutputFile=/tmp/output.pdf',
       '/tmp/input.pdf'
@@ -291,16 +303,20 @@ async function optimizePdf(pdfData, settings) {
     try { gsModule.FS.unlink('/tmp/output.pdf'); } catch (e) { /* ignore */ }
 
     // Enviar sucesso
+    // Enviar sucesso
     self.postMessage({
       type: 'optimized',
       payload: { pdfData: new Uint8Array(optimizedData) }
     });
+    
+    isOptimizing = false;
 
   } catch (error) {
     self.postMessage({
       type: 'error',
       payload: { error: error.message || 'Erro na otimização' }
     });
+    isOptimizing = false;
   }
 }
 

@@ -50,6 +50,9 @@ const progressPercent = computed(() => {
 const statusText = computed(() => {
   if (isLoading.value) return 'Preparando Ghostscript...';
   if (isOptimizing.value) {
+    if (progress.value.total > 0) {
+      return `Otimizando página ${progress.value.current} de ${progress.value.total}`;
+    }
     return 'Otimizando PDF...';
   }
   return '';
@@ -110,7 +113,9 @@ async function handleOptimize() {
     AppEvents.optimizationStarted(selectedPreset.value, selectedFile.value.size);
 
     // Executar otimização
-    const result = await optimizePdf(pdfData, selectedPreset.value);
+    const result = await optimizePdf(pdfData, selectedPreset.value, (current, total) => {
+      progress.value = { current, total };
+    });
 
     // Processar resultado
     const optimizedBlobUrl = uint8ArrayToObjectUrl(result.pdfData, 'application/pdf');
