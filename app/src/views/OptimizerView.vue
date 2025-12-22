@@ -12,7 +12,7 @@ import {
 } from '@/services/ghostscript/GhostscriptWorkerService';
 
 // Tipos
-type OptimizationPreset = '/screen' | '/ebook' | '/printer' | '/prepress' | '/default';
+type OptimizationPreset = '/screen' | '/ebook' | '/printer' | '/prepress' | 'custom';
 
 interface PresetOption {
   value: OptimizationPreset;
@@ -28,6 +28,7 @@ const presets: PresetOption[] = [
   { value: '/ebook', label: 'Ebook (Média)', dpi: '150 DPI', desc: 'Equilíbrio entre qualidade e tamanho. Bom para leitura.', icon: '📚' },
   { value: '/printer', label: 'Impressão (Alta)', dpi: '300 DPI', desc: 'Alta qualidade para impressoras caseiras ou escritório.', icon: '🖨️' },
   { value: '/prepress', label: 'Gráfica (Máxima)', dpi: '300 DPI', desc: 'Preserva cores e fontes para impressão profissional.', icon: '🎨' },
+  { value: 'custom', label: 'Personalizado', dpi: 'Configurável', desc: 'Ajuste fino de resolução e qualidade.', icon: '⚙️' },
 ];
 
 // Estado
@@ -40,6 +41,14 @@ const error = ref<string | null>(null);
 const optimizedPdfUrl = ref<string | null>(null);
 const optimizedSize = ref<number>(0);
 const optimizationTime = ref<number>(0);
+
+// Custom Settings State
+const customSettings = ref({
+  resolution: 150,
+  grayscale: false,
+  embedFonts: true,
+  imageQuality: 'medium' as 'low' | 'medium' | 'high'
+});
 
 // Computed
 const progressPercent = computed(() => {
@@ -113,7 +122,8 @@ async function handleOptimize() {
     AppEvents.optimizationStarted(selectedPreset.value, selectedFile.value.size);
 
     // Executar otimização
-    const result = await optimizePdf(pdfData, selectedPreset.value, (current, total) => {
+    const settings = selectedPreset.value === 'custom' ? { ...customSettings.value } : selectedPreset.value;
+    const result = await optimizePdf(pdfData, settings, (current, total) => {
       progress.value = { current, total };
     });
 
@@ -211,6 +221,44 @@ function handleDownload() {
               </svg>
             </div>
           </button>
+        </div>
+      </div>
+
+      <!-- Custom Settings Panel -->
+      <div v-if="selectedPreset === 'custom'" class="custom-settings">
+        <div class="setting-row">
+          <label>Resolução (DPI)</label>
+          <select v-model="customSettings.resolution">
+            <option :value="72">72 DPI (Tela)</option>
+            <option :value="96">96 DPI (Web)</option>
+            <option :value="150">150 DPI (Ebook)</option>
+            <option :value="200">200 DPI (Intermediário)</option>
+            <option :value="250">250 DPI (Alto)</option>
+            <option :value="300">300 DPI (Impressão)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <label>Qualidade de Imagem</label>
+          <select v-model="customSettings.imageQuality">
+            <option value="low">Baixa (Menor tamanho)</option>
+            <option value="medium">Média (Equilibrado)</option>
+            <option value="high">Alta (Melhor qualidade)</option>
+          </select>
+        </div>
+
+        <div class="setting-row checkbox">
+          <label>
+            <input type="checkbox" v-model="customSettings.grayscale">
+            Converter para Escala de Cinza
+          </label>
+        </div>
+
+        <div class="setting-row checkbox">
+          <label>
+            <input type="checkbox" v-model="customSettings.embedFonts">
+            Incorporar Fontes (Recomendado)
+          </label>
         </div>
       </div>
 
@@ -618,5 +666,50 @@ function handleDownload() {
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom Settings */
+.custom-settings {
+  background: var(--bg-base);
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  margin-top: 1.5rem;
+  border: 1px solid var(--border);
+}
+
+.setting-row {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.setting-row label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.setting-row select {
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.setting-row.checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.setting-row.checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gs-cyan);
 }
 </style>

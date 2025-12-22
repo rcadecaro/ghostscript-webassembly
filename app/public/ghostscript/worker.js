@@ -273,20 +273,64 @@ async function optimizePdf(pdfData, settings) {
     
     isOptimizing = true;
     detectedTotalPages = 0; // Resetar contagem
-
     // Argumentos base
     const args = [
       '-sDEVICE=pdfwrite',
       '-dCompatibilityLevel=1.4',
-      `-dPDFSETTINGS=${settings || '/ebook'}`,
       '-dNOPAUSE',
-      `-dPDFSETTINGS=${settings || '/ebook'}`,
-      '-dNOPAUSE',
-      // '-dQUIET', // Removido para permitir logs de progresso
       '-dBATCH',
       '-sOutputFile=/tmp/output.pdf',
-      '/tmp/input.pdf'
     ];
+
+    // Configurar baseados nos settings
+    if (typeof settings === 'string') {
+      // Preset padrão
+      args.push(`-dPDFSETTINGS=${settings}`);
+    } else {
+      // Configurações personalizadas
+      
+      // 1. Resolução (DPI)
+      if (settings.resolution) {
+        const dpi = settings.resolution;
+        args.push(`-r${dpi}`);
+        args.push(`-dColorImageResolution=${dpi}`);
+        args.push(`-dGrayImageResolution=${dpi}`);
+        args.push(`-dMonoImageResolution=${dpi}`);
+        // Forçar downsampling se a imagem for maior que a resolução alvo
+        args.push('-dDownsampleColorImages=true');
+        args.push('-dDownsampleGrayImages=true');
+        args.push('-dDownsampleMonoImages=true');
+      }
+
+      // 2. Modo de Cor (Grayscale)
+      if (settings.grayscale) {
+        args.push('-sColorConversionStrategy=Gray');
+        args.push('-sProcessColorModel=DeviceGray');
+      }
+
+      // 3. Incorporação de Fontes
+      if (settings.embedFonts) {
+        args.push('-dEmbedAllFonts=true');
+        args.push('-dSubsetFonts=true');
+      } else {
+        args.push('-dEmbedAllFonts=false');
+      }
+
+      // 4. Qualidade de Imagem (Compressão)
+      // Usar /printer (300 DPI) como base segura para permitir downsampling correto
+      // para resoluções menores (ex: 200, 150, 72).
+      // Se usássemos /ebook (150) e pedíssemos 200, poderia dar conflito.
+      let basePreset = '/printer';
+      
+      // Se o usuário escolheu qualidade baixa explicitamente, podemos ser mais agressivos
+      if (settings.imageQuality === 'low') basePreset = '/screen';
+      
+      args.splice(4, 0, `-dPDFSETTINGS=${basePreset}`);
+    }
+
+    args.push('/tmp/input.pdf');
+
+
 
     // Executar
     const exitCode = gsModule.callMain(args);

@@ -117,6 +117,8 @@
 - `fix: corrige conflito de IDs no upload e extensão de download`
 - `style: move variáveis CSS para escopo global`
 - `feat: adiciona rastreamento de progresso detalhado na otimização`
+- `feat: implementa configurações personalizadas de otimização (DPI, Grayscale, Fontes)`
+- `fix: resolve travamento na otimização usando base /printer para resoluções customizadas`
 
 ---
 

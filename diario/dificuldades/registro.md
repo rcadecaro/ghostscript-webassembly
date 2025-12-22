@@ -132,3 +132,26 @@ steps:
      │<────── postMessage({type:'progress'}) ─┤
      │<────── postMessage({type:'complete'}) ─┤
 ```
+
+## 22/12/2025 - Conflito de Resolução no Ghostscript
+
+### Problema
+
+Ao implementar configurações personalizadas de otimização, a tentativa de usar uma resolução de 200 DPI travava o processo na primeira página.
+
+### Causa
+
+Estávamos usando o preset `/ebook` (que força 150 DPI) como base e tentando sobrescrever com `-r200`. O Ghostscript entrava em um estado de conflito ou processamento excessivamente lento ao tentar fazer "upsampling" ou lidar com parâmetros contraditórios no dispositivo `pdfwrite`.
+
+### Solução
+
+Alteramos a lógica para usar o preset `/printer` (300 DPI) como base para qualquer configuração personalizada que não seja explicitamente "baixa qualidade".
+Isso garante que o Ghostscript sempre realize **downsampling** (redução de resolução), o que é uma operação mais segura e performática para o motor.
+
+```javascript
+// worker.js
+// Usar /printer (300 DPI) como base segura para permitir downsampling correto
+let basePreset = "/printer";
+if (settings.imageQuality === "low") basePreset = "/screen";
+args.splice(4, 0, `-dPDFSETTINGS=${basePreset}`);
+```

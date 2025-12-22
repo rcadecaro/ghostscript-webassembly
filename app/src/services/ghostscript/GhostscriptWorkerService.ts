@@ -30,6 +30,13 @@ export interface OptimizeResult {
   pdfData: Uint8Array;
 }
 
+export interface CustomSettings {
+  resolution: number;
+  grayscale: boolean;
+  embedFonts: boolean;
+  imageQuality: 'low' | 'medium' | 'high';
+}
+
 // Worker instance
 let worker: Worker | null = null;
 let isInitialized = false;
@@ -252,9 +259,10 @@ export async function convertPdfWithWorker(
 /**
  * Otimiza PDF usando o Worker
  */
+
 export async function optimizePdf(
   pdfData: Uint8Array,
-  settings: string = '/ebook',
+  settings: string | CustomSettings = '/ebook',
   onProgress?: (current: number, total: number) => void
 ): Promise<OptimizeResult> {
   if (!isInitialized) {
